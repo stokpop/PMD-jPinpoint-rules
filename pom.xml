@@ -259,12 +259,27 @@
             <scope>compile</scope>
         </dependency>
 
+        <!-- kotlin-type-mapper: semantic Kotlin AST analysis for rule development/testing.
+             Build locally first: cd ../kotlin-type-mapper && ./gradlew publishToMavenLocal -->
+        <dependency>
+            <groupId>nl.stokpop.typemapper</groupId>
+            <artifactId>kotlin-type-mapper-analyzer</artifactId>
+            <version>0.1.2</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
     <repositories>
         <repository>
             <id>maven_central</id>
             <name>Maven Central</name>
             <url>https://repo.maven.apache.org/maven2/</url>
+        </repository>
+        <!-- kotlin-type-mapper is published locally via: ./gradlew publishToMavenLocal (run from kotlin-type-mapper/) -->
+        <repository>
+            <id>local</id>
+            <name>Local Maven Repository</name>
+            <url>file://${user.home}/.m2/repository</url>
         </repository>
     </repositories>
 
