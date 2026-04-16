@@ -264,7 +264,7 @@
         <dependency>
             <groupId>nl.stokpop.typemapper</groupId>
             <artifactId>kotlin-type-mapper-analyzer</artifactId>
-            <version>0.1.2</version>
+            <version>0.3.1</version>
             <scope>test</scope>
         </dependency>
 
