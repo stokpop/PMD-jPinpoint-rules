@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: Avoid Future Join Without Timeout</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>8, 20</expected-linenumbers>
+        <code><![CDATA[
+import java.util.concurrent.*
+
+class Bad1 {
+    fun getOrders(services: List<Any>): List<Any> {
+        val futures = services.map { CompletableFuture.supplyAsync { it } }
+        return futures
+            .filter { it.isDone && !it.isCompletedExceptionally }
+            .map { it.join() } // bad, NO timeout provided
+    }
+}
+
+class Bad2 {
+    fun getOrders(futures: List<CompletableFuture<Any>>): List<Any> {
+        val allResult = CompletableFuture.allOf(*futures.toTypedArray())
+        try {
+            allResult.get() // missing timeout
+        } catch (e: Exception) { }
+        return futures
+            .filter { it.isDone && !it.isCompletedExceptionally }
+            .map { it.join() } // bad since has NO timeout above
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: Avoid Future Join Without Timeout - good cases with timeout</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.concurrent.*
+
+class Good1 {
+    fun getOrders(futures: List<CompletableFuture<Any>>): List<Any> {
+        val allResult = CompletableFuture.allOf(*futures.toTypedArray())
+        try {
+            allResult.get(5L, TimeUnit.SECONDS) // good
+        } catch (e: Exception) { }
+        return futures
+            .filter { it.isDone && !it.isCompletedExceptionally }
+            .map { it.join() } // good, timeout provided above
+    }
+}
+
+class Good2 {
+    fun doSomething(futures: Array<CompletableFuture<Any>>) {
+        CompletableFuture.allOf(*futures)
+            .orTimeout(5L, TimeUnit.SECONDS)
+            .join() // good - chained orTimeout
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: Avoid Future Join Without Timeout - false positive on String.join</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.concurrent.*
+
+class Foo {
+    fun extract(str: String, items: List<String>): String {
+        return String.join(", ", items) // not Future.join, no violation
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: Avoid Future Join Without Timeout - missed case chained allOf.join</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.concurrent.*
+
+class Bar {
+    fun foo(futures: Array<CompletableFuture<Any>>) {
+        CompletableFuture.allOf(*futures).join() // bad
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: Avoid Future Join Without Timeout - good case with completeOnTimeout</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.concurrent.*
+
+class Good3 {
+    fun doSomething(futures: Array<CompletableFuture<Any>>) {
+        CompletableFuture.allOf(*futures)
+            .completeOnTimeout(null, 5L, TimeUnit.SECONDS)
+            .join() // good - completeOnTimeout used
+    }
+}
+]]></code>
+    </test-code>
+
+</test-data>

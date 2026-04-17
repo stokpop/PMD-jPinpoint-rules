@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="jpinpoint-kotlin-concurrent-rules" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0">
+    <description>jPinpoint rule set for performance aware Kotlin coding related to concurrency, sponsored by Rabobank.</description>
+
+    <rule name="AvoidFutureGetWithoutTimeout"
+          language="kotlin"
+          message="Avoid future.get without timeout"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ia06">
+        <description>
+            Problem: Stalls indefinitely in case of hanging threads and consumes a thread.&#13;
+            Solution: Provide a timeout value and handle the timeout.
+            (jpinpoint-rules)
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.concurrent.Future#get()')
+    and ./PostfixUnarySuffix/NavigationSuffix[@Identifier='get']
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun bad(complFuture: CompletableFuture<String>): String {
+    return complFuture.get() // bad
+}
+
+fun good(complFuture: CompletableFuture<String>): String {
+    return complFuture.get(10, TimeUnit.SECONDS) // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidFutureJoinWithoutTimeout"
+          language="kotlin"
+          message="Avoid future.join without timeout"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ia07">
+        <description>
+            Problem: Stalls indefinitely in case of hanging thread(s) and consumes a thread.&#13;
+            Solution: Provide a timeout before the join and handle the timeout. For example a future.get(timeout, unit), an orTimeout() or a completeOnTimeout(). You may want to use CompletableFuture.allOf() too.
+            (jpinpoint-rules)
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: future.join() without any timeout method anywhere in the same function body :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.concurrent.Future#join()')
+    and ./PostfixUnarySuffix/NavigationSuffix[@Identifier='join']
+    and not(
+        ancestor::FunctionBody//PostfixUnaryExpression[
+            pmd-kotlin:matchesSig('java.util.concurrent.Future#get(_,java.util.concurrent.TimeUnit)')
+            or pmd-kotlin:matchesSig('java.util.concurrent.CompletableFuture#orTimeout(_,java.util.concurrent.TimeUnit)')
+            or pmd-kotlin:matchesSig('java.util.concurrent.CompletableFuture#completeOnTimeout(_,_,java.util.concurrent.TimeUnit)')
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun getOrdersBad(futures: List<CompletableFuture<Order>>): List<Order> {
+    return futures
+        .filter { it.isDone && !it.isCompletedExceptionally }
+        .map { it.join() } // bad, no timeout provided
+}
+
+fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
+    val allResult = CompletableFuture.allOf(*futures.toTypedArray())
+    try {
+        allResult.get(5L, TimeUnit.SECONDS) // good - timeout
+    } catch (e: Exception) { }
+    return futures
+        .filter { it.isDone && !it.isCompletedExceptionally }
+        .map { it.join() } // good - timeout provided above
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidCommonPoolForFutureAsync"
+          language="kotlin"
+          message="Avoid using the common thread pool for future.supplyAsync, use a separate pool."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ia08">
+        <description>
+            Problem: CompletableFuture.supplyAsync is typically used for remote calls. By default, it uses the common pool.
+            The number of threads in the common pool is equal to the number of CPUs, which is suitable for in-memory processing.
+            For I/O, however, this number is typically not suitable because most time is spent waiting for the response and not in CPU.
+            The common pool must not be used for blocking calls.&#13;
+            Solution: A separate, properly sized, pool of threads (an Executor) should be used for the async calls.
+            (jpinpoint-rules)
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall,unpredictable" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.concurrent.CompletableFuture#supplyAsync(_)')
+    and ./PostfixUnarySuffix/NavigationSuffix[@Identifier='supplyAsync']
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Foo {
+    private val asyncPool = Executors.newFixedThreadPool(8)
+
+    fun bad(accounts: List<Any>) {
+        val futures = accounts.map {
+            CompletableFuture.supplyAsync { isAccountBlocked(it) } // bad, uses common pool
+        }
+    }
+
+    fun good(accounts: List<Any>) {
+        val futures = accounts.map {
+            CompletableFuture.supplyAsync({ isAccountBlocked(it) }, asyncPool) // good
+        }
+    }
+}
+        ]]></example>
+    </rule>
+
+</ruleset>
