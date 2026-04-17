@@ -18,17 +18,17 @@
             <property name="xpath">
                 <value><![CDATA[
 (:locally created http client builder without disableConnectionState :)
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[@Text="custom"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="HttpClients"
-  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="disableConnectionState")]
+//PostfixUnarySuffix//NavigationSuffix[@Identifier="custom"
+  and ancestor::PostfixUnaryExpression/PrimaryExpression/@Identifier="HttpClients"
+  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/@Identifier="disableConnectionState")]
 ,
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[@Text="create"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier[(@Text="HttpClientBuilder" or @Text="HttpAsyncClientBuilder")
-  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="disableConnectionState")]]
+//PostfixUnarySuffix//NavigationSuffix[@Identifier="create"
+  and ancestor::PostfixUnaryExpression/PrimaryExpression[(@Identifier="HttpClientBuilder" or @Identifier="HttpAsyncClientBuilder")
+  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/@Identifier="disableConnectionState")]]
 ,
 (: method param http client builder without disableConnectionState :)
-//FunctionValueParameter/Parameter/Type/TypeReference/UserType/SimpleUserType/SimpleIdentifier/T-Identifier[(@Text="HttpClients" or @Text="HttpClientBuilder" or @Text="HttpAsyncClientBuilder")
-  and not(ancestor::FunctionDeclaration//PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="disableConnectionState")]
+//FunctionValueParameter/Parameter/Type/TypeReference/UserType/SimpleUserType[(@Identifier="HttpClients" or @Identifier="HttpClientBuilder" or @Identifier="HttpAsyncClientBuilder")
+  and not(ancestor::FunctionDeclaration//PostfixUnarySuffix/NavigationSuffix/@Identifier="disableConnectionState")]
 ]]>
                 </value>
             </property>
@@ -60,46 +60,47 @@
             <property name="tags" value="io,jpinpoint-rule,performance,pitfall,resilience" type="String" description="classification"/>
             <property name="xpath">
                 <value><![CDATA[
-(: v4/v5 builders without setDefaultRequestConfig :)
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[@Text="create"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="HttpClientBuilder"
-  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="setDefaultRequestConfig")]
-,
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[@Text="create"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="HttpAsyncClientBuilder"
-  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="setDefaultRequestConfig")]
-,
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[@Text="custom"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="HttpClients"
-  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="setDefaultRequestConfig")]
-,
-(: v4 RequestConfig missing at least one of the three timeouts:)
-//ImportHeader[.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='http'] and .//T-Identifier[@Text='client'] and .//T-Identifier[@Text='config'] and .//T-Identifier[@Text='RequestConfig']][1]/ancestor::KotlinFile
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[
-  @Text="custom"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="RequestConfig"
-  and not(
-    count(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text=('setConnectionRequestTimeout','setConnectTimeout','setSocketTimeout')]/@Text) = 3
-  )
+(: v4/v5 builders without setDefaultRequestConfig - @Identifier replaces SimpleIdentifier/T-Identifier traversal :)
+//PostfixUnaryExpression[
+    PrimaryExpression[@Identifier="HttpClientBuilder"]
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier="create"]
+    and not(.//NavigationSuffix[@Identifier="setDefaultRequestConfig"])
 ]
 ,
-(: v5 RequestConfig missing at least one of the two timeouts:)
-//ImportHeader[.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='hc'] and .//T-Identifier[@Text='client5'] and .//T-Identifier[@Text='http'] and .//T-Identifier[@Text='config'] and .//T-Identifier[@Text='RequestConfig']][1]/ancestor::KotlinFile
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[
-  @Text="custom"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="RequestConfig"
-  and not(
-    ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="setConnectionRequestTimeout"
-    and ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="setResponseTimeout"
-  )
+//PostfixUnaryExpression[
+    PrimaryExpression[@Identifier="HttpAsyncClientBuilder"]
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier="create"]
+    and not(.//NavigationSuffix[@Identifier="setDefaultRequestConfig"])
+]
+,
+//PostfixUnaryExpression[
+    PrimaryExpression[@Identifier="HttpClients"]
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier="custom"]
+    and not(.//NavigationSuffix[@Identifier="setDefaultRequestConfig"])
+]
+,
+(: v4 RequestConfig missing at least one of the three timeouts - requires kotlin-type-mapper auxClasspath; matchesSig replaces import filter :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.apache.http.client.config.RequestConfig#custom()')
+    and not(
+        count(PostfixUnarySuffix/NavigationSuffix[@Identifier=('setConnectionRequestTimeout','setConnectTimeout','setSocketTimeout')]) = 3
+    )
+]
+,
+(: v5 RequestConfig missing at least one of the two timeouts - requires kotlin-type-mapper auxClasspath; matchesSig replaces import filter :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.apache.hc.client5.http.config.RequestConfig#custom()')
+    and not(
+        PostfixUnarySuffix/NavigationSuffix[@Identifier='setConnectionRequestTimeout']
+        and PostfixUnarySuffix/NavigationSuffix[@Identifier='setResponseTimeout']
+    )
 ]
 ,
 (: Spring HttpComponentsClientHttpRequestFactory missing full timeout configuration in a function :)
-//SimpleIdentifier/T-Identifier[@Text='HttpComponentsClientHttpRequestFactory'
-  and ancestor::FunctionDeclaration[
-    count(.//SimpleIdentifier/T-Identifier[@Text=('setConnectTimeout', 'setConnectionRequestTimeout', 'setReadTimeout')]) < 3
-  ]
-]
+//FunctionDeclaration[
+    .//PrimaryExpression[@Identifier='HttpComponentsClientHttpRequestFactory']
+    and count(.//NavigationSuffix[@Identifier=('setConnectTimeout', 'setConnectionRequestTimeout', 'setReadTimeout')]) < 3
+]/(.//PrimaryExpression[@Identifier='HttpComponentsClientHttpRequestFactory'])[1]
 ]]>
                 </value>
             </property>
@@ -154,7 +155,7 @@ class GoodHttpClientV5 {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: check if javax.xml.xpath imports exists as filter for same named classes in other packages :)
+(: TODO: replace with pmd-kotlin:hasImport('com.netflix.hystrix.*') once that function is implemented :)
 //ImportHeader[.//T-Identifier[@Text='com'] and .//T-Identifier[@Text='netflix'] and .//T-Identifier[@Text='hystrix']][1]/../..
 ]]>
                 </value>
@@ -186,62 +187,48 @@ class GoodHttpClientV5 {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: check if Apache HttpClient v4 or v5 imports exist to avoid name clashes :)
-//ImportHeader[
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='http'])
-  or
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='hc'] and .//T-Identifier[@Text='client5'])
-][1]/ancestor::KotlinFile
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[
-  @Text='custom' and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text='HttpClients'
+(: import filters dropped - Apache HttpClient class names are distinctive; @Identifier replaces T-Identifier traversal :)
+//PostfixUnaryExpression[
+    PrimaryExpression[@Identifier='HttpClients']
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier='custom']
 ][
-  ancestor::FunctionDeclaration[
-    not(.//SimpleIdentifier/T-Identifier[@Text='setConnectionManager'] or
-        (.//SimpleIdentifier/T-Identifier[@Text='setMaxConnTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setMaxConnPerRoute'])
-    )
-  ]
+    ancestor::FunctionDeclaration[
+        not(.//NavigationSuffix[@Identifier='setConnectionManager']
+            or (.//NavigationSuffix[@Identifier='setMaxConnTotal'] and .//NavigationSuffix[@Identifier='setMaxConnPerRoute']))
+    ]
 ]
 |
-//ImportHeader[
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='http'])
-  or
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='hc'] and .//T-Identifier[@Text='client5'])
-][1]/ancestor::KotlinFile
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[
-  @Text='create' and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='HttpClientBuilder' or @Text='HttpAsyncClientBuilder']
+//PostfixUnaryExpression[
+    PrimaryExpression[(@Identifier='HttpClientBuilder' or @Identifier='HttpAsyncClientBuilder')]
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier='create']
 ][
-  ancestor::FunctionDeclaration[
-    not(.//SimpleIdentifier/T-Identifier[@Text='setConnectionManager'] or
-        (.//SimpleIdentifier/T-Identifier[@Text='setMaxConnTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setMaxConnPerRoute'])
-    )
-  ]
+    ancestor::FunctionDeclaration[
+        not(.//NavigationSuffix[@Identifier='setConnectionManager']
+            or (.//NavigationSuffix[@Identifier='setMaxConnTotal'] and .//NavigationSuffix[@Identifier='setMaxConnPerRoute']))
+    ]
 ]
 |
-//ImportHeader[
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='http'])
-  or
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='hc'] and .//T-Identifier[@Text='client5'])
-][1]/ancestor::KotlinFile
-//FunctionDeclaration//TypeReference//SimpleIdentifier/T-Identifier[@Text='PoolingHttpClientConnectionManager' or @Text='PoolingAsyncClientConnectionManager']
-[
-  ancestor::FunctionDeclaration[
-    not(
-      (.//SimpleIdentifier/T-Identifier[@Text='setMaxTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setDefaultMaxPerRoute'])
-      or (
-        (.//SimpleIdentifier/T-Identifier[@Text='setMaxConnTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setMaxConnPerRoute'])
-        and .//SimpleIdentifier/T-Identifier[@Text='PoolingHttpClientConnectionManagerBuilder']
-      )
-    )
-    and not(
-      ancestor::ClassBody//FunctionDeclaration[
-        (.//SimpleIdentifier/T-Identifier[@Text='setMaxTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setDefaultMaxPerRoute'])
-        or (
-          (.//SimpleIdentifier/T-Identifier[@Text='setMaxConnTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setMaxConnPerRoute'])
-          and .//SimpleIdentifier/T-Identifier[@Text='PoolingHttpClientConnectionManagerBuilder']
+//FunctionDeclaration//TypeReference//SimpleUserType[
+    @Identifier='PoolingHttpClientConnectionManager' or @Identifier='PoolingAsyncClientConnectionManager'
+][
+    ancestor::FunctionDeclaration[
+        not(
+            (.//NavigationSuffix[@Identifier='setMaxTotal'] and .//NavigationSuffix[@Identifier='setDefaultMaxPerRoute'])
+            or (
+                (.//NavigationSuffix[@Identifier='setMaxConnTotal'] and .//NavigationSuffix[@Identifier='setMaxConnPerRoute'])
+                and .//PrimaryExpression[@Identifier='PoolingHttpClientConnectionManagerBuilder']
+            )
         )
-      ]
-    )
-  ]
+        and not(
+            ancestor::ClassBody//FunctionDeclaration[
+                (.//NavigationSuffix[@Identifier='setMaxTotal'] and .//NavigationSuffix[@Identifier='setDefaultMaxPerRoute'])
+                or (
+                    (.//NavigationSuffix[@Identifier='setMaxConnTotal'] and .//NavigationSuffix[@Identifier='setMaxConnPerRoute'])
+                    and .//PrimaryExpression[@Identifier='PoolingHttpClientConnectionManagerBuilder']
+                )
+            ]
+        )
+    ]
 ]
                 ]]></value>
             </property>
@@ -281,11 +268,16 @@ fun goodWithSizes(): HttpClient =
             <property name="tags" value="io,jpinpoint-rule,performance,sustainability-low,resilience" type="String" description="classification"/>
             <property name="xpath">
                 <value><![CDATA[
-//ImportHeader[
-  .//T-Identifier[@Text='reactor'] and .//T-Identifier[@Text='netty'] and .//T-Identifier[@Text='resources']
-][1]/ancestor::KotlinFile
-  //FunctionBody//Statement//T-Identifier[@Text='ConnectionProvider']/../../..//T-Identifier[@Text='builder']
-    [not(ancestor::Statement//T-Identifier[@Text='maxConnections']) or not (ancestor::Statement//T-Identifier[@Text='pendingAcquireTimeout'])]
+(: import filter dropped - ConnectionProvider/reactor-netty class name is distinctive; @Identifier and matchesSig :)
+(: requires kotlin-type-mapper auxClasspath for matchesSig on reactor.netty.resources.ConnectionProvider :)
+//FunctionBody//PostfixUnaryExpression[
+    PrimaryExpression[@Identifier='ConnectionProvider']
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier='builder']
+    and (
+        not(.//NavigationSuffix[@Identifier='maxConnections'])
+        or not(.//NavigationSuffix[@Identifier='pendingAcquireTimeout'])
+    )
+]
                 ]]></value>
             </property>
         </properties>

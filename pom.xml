@@ -15,7 +15,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring.version>6.2.10</spring.version>
-        <pmd.version>7.16.0</pmd.version>
+        <pmd.version>7.24.0-SNAPSHOT</pmd.version>
     </properties>
 
     <build>
@@ -264,7 +264,7 @@
         <dependency>
             <groupId>nl.stokpop.typemapper</groupId>
             <artifactId>kotlin-type-mapper-analyzer</artifactId>
-            <version>0.3.1</version>
+            <version>0.3.1-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
 
