@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>violation: unguarded assignment in class with @Synchronized method</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+class Bad {
+    var date: String = ""
+
+    fun setDate(d: String) {
+        date = d // bad - synchronized used in class
+    }
+
+    @Synchronized
+    fun getDate(): String = date
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: unguarded assignment in class with synchronized block</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+class Bad2 {
+    var date: String = ""
+
+    fun setDate(d: String) {
+        date = d // bad - synchronized block used in class
+    }
+
+    fun getDate(): String {
+        return synchronized(this) {
+            date
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: no synchronized used</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Good {
+    var date: String = ""
+
+    fun setDate(d: String) {
+        date = d // good - no synchronized in class
+    }
+
+    fun getDate(): String = date
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @NotThreadSafe</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@NotThreadSafe
+class Good2 {
+    var date: String = ""
+
+    @Synchronized
+    fun setDate(d: String) {
+        date = d
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: field is @GuardedBy</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodGuarded {
+    @GuardedBy("this")
+    var date: String = ""
+
+    fun setDate(d: String) {
+        date = d // good for this rule - GuardedBy stated
+    }
+
+    @Synchronized
+    fun getDate(): String = date
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: field is @Volatile</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodVolatile {
+    @Volatile var date: String = ""
+
+    fun setDate(d: String) {
+        date = d // good - volatile
+    }
+
+    @Synchronized
+    fun getDate(): String = date
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: assignment inside @Inject method</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodInject {
+    @GuardedBy("this")
+    var date: String = ""
+    var ref: Any? = null
+
+    @Inject
+    fun setRef(r: Any) {
+        ref = r
+    }
+
+    @Synchronized
+    fun getDate(): String = date
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: local var shadows field name</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Good3 {
+    var detailsResponse: String = ""
+
+    fun getDetails(): String {
+        var detailsResponse: String? = null
+        try {
+            detailsResponse = produceResponse()
+        } catch (e: Exception) {
+            throw RuntimeException(e.message)
+        }
+        return detailsResponse ?: ""
+    }
+
+    @Synchronized
+    fun sync() {}
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>violation: var field in @Service without guards</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+@Service
+class AService {
+    @Value("\${batchService.http.url}")
+    var url: String = "" // bad: @Value var with unguarded setter
+
+    fun setUrlViolate(url: String) {
+        this.url = url // unguarded accessor
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Value var with no unguarded assignment elsewhere</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@Service
+class GoodService {
+    @Value("\${batchService.http.url}")
+    var url: String = "" // good: @Value with no other assignment
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: not a shared object</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class NotShared {
+    var url: String = "" // good, not a singleton
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @NotThreadSafe</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@Service
+@NotThreadSafe
+class NotThreadSafeService {
+    var url: String = "" // good, @NotThreadSafe
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @GuardedBy field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@Component
+class GuardedService {
+    @GuardedBy("this")
+    var url: String = "" // good, guarded
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Volatile field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@Service
+class VolatileService {
+    @Volatile var url: String = "" // good, volatile
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Autowired field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@Component
+class AutowiredService {
+    @Autowired
+    lateinit var restTemplate: Any // good, injected
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: mutable type Date in @Service</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+@Service
+class BadMutableDate {
+    val date: java.util.Date = java.util.Date() // bad, Date is mutable even with val
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: mutable HashMap in @Component</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+@Component
+class BadMutableMap {
+    val map: java.util.HashMap<String, String> = java.util.HashMap() // bad, mutable
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @GuardedBy on mutable type</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@Component
+class GoodGuardedMap {
+    @GuardedBy("this")
+    val map: java.util.HashMap<String, String> = java.util.HashMap() // good, guarded
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Scope("request")</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@Service
+@Scope("request")
+class RequestScoped {
+    var url: String = "" // good, request scoped
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @ConfigurationProperties</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@ConfigurationProperties(prefix = "app")
+@Component
+class AppConfig {
+    var url: String = "" // good, ConfigurationProperties
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: var only assigned in @PostConstruct</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@Service
+class PostConstructService {
+    var url: String = ""
+
+    @PostConstruct
+    fun init() {
+        url = "http://example.com"
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
