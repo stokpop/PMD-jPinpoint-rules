@@ -268,4 +268,26 @@ class ParamShadowing {
 ]]></code>
     </test-code>
 
+    <test-code>
+        <description>violation: unguarded assignment to companion object var field</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>8</expected-linenumbers>
+        <code><![CDATA[
+@Service
+class MyService {
+    companion object {
+        @Volatile var safeCounter: Int = 0       // guarded by @Volatile
+        var unsafeCounter: Int = 0               // not guarded
+    }
+    fun incrementBad() {
+        unsafeCounter = unsafeCounter + 1 // bad: unguarded assignment to companion var
+    }
+    @Synchronized
+    fun incrementGood() {
+        unsafeCounter = unsafeCounter + 1 // good: synchronized
+    }
+}
+        ]]></code>
+    </test-code>
+
 </test-data>

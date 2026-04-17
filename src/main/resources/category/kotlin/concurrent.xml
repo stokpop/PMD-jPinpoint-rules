@@ -174,7 +174,6 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
       @Text = ancestor::ClassBody[1]//PropertyDeclaration[
         T-VAR
         and not(ancestor::FunctionBody)
-        and not(ancestor::CompanionObject)
         (: not @Volatile :)
         and not(pmd-kotlin:hasAnnotation('Volatile') or pmd-kotlin:hasAnnotation('kotlin.jvm.Volatile'))
         (: not @GuardedBy :)
@@ -201,7 +200,7 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
       (: not in an init block (constructor-like) :)
       and not(ancestor::ClassBody/AnonymousInitializer)
       (: the name is NOT a known var field of THIS class :)
-      and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody) and not(ancestor::CompanionObject)]/VariableDeclaration/@Identifier)
+      and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
       (: and not a local var :)
       and not(@Text = ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration/@Identifier)
       (: and not a function parameter :)
@@ -224,8 +223,6 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
   ])
   (: not in afterPropertiesSet function :)
   and not(ancestor::FunctionDeclaration[SimpleIdentifier/T-Identifier[@Text='afterPropertiesSet']])
-  (: not in a companion object (static context) :)
-  and not(ancestor::CompanionObject)
   (: not in a nested object declaration (static-like inner class) :)
   and not(ancestor::ObjectDeclaration[ancestor::ClassBody])
 ]
@@ -249,6 +246,84 @@ class MyService {
     fun setUrlGood(url: String) {
         this.url = url // good: synchronized accessor method
     }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidNonPrivateFieldsInSharedObjects"
+          language="kotlin"
+          message="Avoid non-private properties in shared objects. Make properties private to ensure thread-safety."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#tutc11">
+        <description>
+            Problem: A singleton, or more general: an object shared among threads, has a property that is not private.
+            These properties can possibly be modified from other classes.&#13;
+            Solution: Make the properties private.
+            Note: properties are excluded when annotated with: @Autowired/@Value/@Inject.
+            (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Kotlin: AvoidNonPrivateFieldsInSharedObjects :)
+(: Find non-private properties in singleton/shared-object classes :)
+
+(: Step 1: Match classes annotated as singletons or shared objects :)
+//ClassDeclaration[
+  (
+       pmd-kotlin:hasAnnotation('Service')
+    or pmd-kotlin:hasAnnotation('Component')
+    or pmd-kotlin:hasAnnotation('Controller')
+    or pmd-kotlin:hasAnnotation('Repository')
+    or pmd-kotlin:hasAnnotation('RestController')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Repository')
+    or pmd-kotlin:hasAnnotation('org.springframework.web.bind.annotation.RestController')
+  )
+  (: exclude request/prototype scope — not shared :)
+  and not(pmd-kotlin:hasAnnotation('RequestScope')
+       or pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
+  (: exclude @Scope("request") or @Scope("prototype") :)
+  and not(.//Annotation//T-Identifier[@Text='Scope']
+      and .//Annotation//T-LineStrText[@Text='request' or @Text='prototype'])
+  (: exclude @NotThreadSafe :)
+  and not(pmd-kotlin:hasAnnotation('NotThreadSafe')
+       or pmd-kotlin:hasAnnotation('net.jcip.annotations.NotThreadSafe'))
+]
+(: Step 2: Find non-private, non-val properties at class level :)
+//PropertyDeclaration[
+  (: not inside a function body — class-level property :)
+  not(ancestor::FunctionBody)
+  (: not private :)
+  and not(pmd-kotlin:modifiers()='private')
+  (: not val (final) :)
+  and not(T-VAL)
+  (: not injection framework annotated :)
+  and not(
+       pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
+    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
+    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+  )
+  (: not in a nested class inside the class body :)
+  and not(ancestor::ClassDeclaration[ancestor::ClassBody])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+@Controller
+class RootController {
+
+    var baskets: List<Any> = listOf()          // bad, not private
+    protected var baskets2: List<Any> = listOf() // bad, not private
+    val baskets3: List<Any> = listOf()          // good, val (final)
+    private var baskets4: List<Any> = listOf()  // good, private
+
+    @Autowired
+    lateinit var baskets5: List<Any>           // allowed, injected
 }
         ]]></example>
     </rule>
