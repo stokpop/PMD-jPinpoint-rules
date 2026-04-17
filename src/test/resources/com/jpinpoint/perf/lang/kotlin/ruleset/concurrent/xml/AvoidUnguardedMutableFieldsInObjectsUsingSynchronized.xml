@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests https://pmd.sourceforge.io/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>violation: var field in class with @Synchronized method</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class Bad {
+    var date: String = ""
+
+    fun setDate(d: String) {
+        date = d
+    }
+
+    @Synchronized
+    fun getDate(): String = date
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: mutable type Date in class with synchronized block</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class Bad {
+    val date: java.util.Date = java.util.Date()
+
+    fun getDate(): java.util.Date {
+        synchronized(this) {
+            return date
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: HashMap mutable collection in class with @Synchronized</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class Bad {
+    val map: java.util.HashMap<String, String> = java.util.HashMap()
+
+    @Synchronized
+    fun getMap(): Map<String, String> = map
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: var and mutable type both flagged</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>2,3</expected-linenumbers>
+        <code><![CDATA[
+class Bad {
+    var name: String = ""
+    val date: java.util.Date = java.util.Date()
+
+    @Synchronized
+    fun getName(): String = name
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: companion object var field</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class Bad {
+    companion object {
+        var counter: Int = 0
+    }
+
+    @Synchronized
+    fun increment() { counter++ }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @NotThreadSafe class</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@net.jcip.annotations.NotThreadSafe
+class Good {
+    var date: String = ""
+
+    @Synchronized
+    fun getDate(): String = date
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @GuardedBy on var field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Good {
+    @net.jcip.annotations.GuardedBy("this")
+    var date: String = ""
+
+    @Synchronized
+    fun getDate(): String = date
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Volatile var field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Good {
+    @Volatile
+    var date: String = ""
+
+    @Synchronized
+    fun getDate(): String = date
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Autowired var field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Good {
+    @org.springframework.beans.factory.annotation.Autowired
+    var service: String = ""
+
+    @Synchronized
+    fun getService(): String = service
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: val immutable field, no synchronized</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Good {
+    val name: String = "hello"
+
+    fun getName(): String = name
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Value field with no unguarded assignment</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Good {
+    @org.springframework.beans.factory.annotation.Value("\${url}")
+    var url: String = ""
+
+    @Synchronized
+    fun getUrl(): String = url
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Inject field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Good {
+    @javax.inject.Inject
+    var service: String = ""
+
+    @Synchronized
+    fun getService(): String = service
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

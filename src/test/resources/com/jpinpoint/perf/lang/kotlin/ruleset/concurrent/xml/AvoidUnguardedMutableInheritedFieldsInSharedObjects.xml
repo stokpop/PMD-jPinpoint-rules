@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests https://pmd.sourceforge.io/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>violation: mutator setTime on inherited field date</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+@org.springframework.stereotype.Component
+class Bad : SomeParent() {
+    fun mutateDateBad() {
+        date.setTime(100)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: mutator put on inherited map field</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+@org.springframework.stereotype.Service
+class Bad : BaseService() {
+    fun mutateMap(key: String, value: String) {
+        map.put(key, value)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: multiple mutator calls on inherited fields</description>
+        <expected-problems>3</expected-problems>
+        <expected-linenumbers>4,5,6</expected-linenumbers>
+        <code><![CDATA[
+@org.springframework.stereotype.Component
+class Bad : SomeParent() {
+    fun mutateAll() {
+        map.clear()
+        list.add("item")
+        map.remove("key")
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: mutator on own field (declared in class)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@org.springframework.stereotype.Component
+class Good : SomeParent() {
+    val ownMap: java.util.HashMap<String, String> = java.util.HashMap()
+
+    fun mutateOwnMap(key: String, value: String) {
+        ownMap.put(key, value)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: mutator on function parameter</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@org.springframework.stereotype.Component
+class Good : SomeParent() {
+    fun mutateParam(map: MutableMap<String, String>, key: String, value: String) {
+        map.put(key, value)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: mutator on local variable</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@org.springframework.stereotype.Component
+class Good : SomeParent() {
+    fun mutateLocal(key: String, value: String) {
+        val map = mutableMapOf<String, String>()
+        map.put(key, value)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: mutator inside @Synchronized function</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@org.springframework.stereotype.Component
+class Good : SomeParent() {
+    @Synchronized
+    fun mutateSynchronized(key: String, value: String) {
+        map.put(key, value)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: mutator inside synchronized block</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@org.springframework.stereotype.Component
+class Good : SomeParent() {
+    val lock = Any()
+
+    fun mutateSyncBlock(key: String, value: String) {
+        synchronized(lock) {
+            map.put(key, value)
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @NotThreadSafe class</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@org.springframework.stereotype.Component
+@net.jcip.annotations.NotThreadSafe
+class Good : SomeParent() {
+    fun mutateDateBad() {
+        date.setTime(100)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: in @PostConstruct method</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@org.springframework.stereotype.Component
+class Good : SomeParent() {
+    @javax.annotation.PostConstruct
+    fun init() {
+        map.clear()
+        map.put("key", "value")
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: class does not extend anything</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@org.springframework.stereotype.Component
+class Good {
+    fun doSomething() {
+        val map = mutableMapOf<String, String>()
+        map.put("key", "value")
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: request scope</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+@org.springframework.stereotype.Component
+@org.springframework.context.annotation.Scope("request")
+class Good : SomeParent() {
+    fun mutateDateBad() {
+        date.setTime(100)
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

@@ -616,4 +616,240 @@ class BadMutableTypes {
         ]]></example>
     </rule>
 
+    <rule name="AvoidUnguardedMutableFieldsInObjectsUsingSynchronized"
+          language="kotlin"
+          message="Avoid unguarded non-final or mutable fields in objects using synchronized. Make final immutable or access thread-safely AND use @GuardedBy."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#tutc07">
+        <description>
+            Problem: Multiple threads typically access fields of an object using synchronized. If a field or its reference is mutable, access is thread-unsafe and may cause corruption or visibility problems. To make this thread-safe, that is, guard the field e.g. with synchronized methods, may cause contention.&#13;
+            Solution: Make the properties val and unmodifiable. If they really need to be mutable, make access thread-safe: use @Synchronized and @GuardedBy or @Volatile.&#13;
+            Notes:&#13;
+            1. Instances of Date, StringBuilder, URL and File are examples of mutable objects and should be avoided (or else guarded) as fields of shared objects.&#13;
+            2. Instances of classes like ArrayList, HashMap and HashSet are also mutable and should be properly wrapped or use thread-safe implementations like ConcurrentHashMap.&#13;
+            3. For autowiring/injection, the assignment of the reference is thread safe, so var is acceptable. The unmodifiable/thread-safe requirement still holds.&#13;
+            4. In case you are sure the class is used in single threaded context only, remove the current use of synchronized and annotate the class with @NotThreadSafe to make this explicit.
+            (jpinpoint-rules)
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Kotlin: AvoidUnguardedMutableFieldsInObjectsUsingSynchronized :)
+(: Find non-final/non-volatile var fields or mutable-typed fields in classes using synchronized :)
+
+(: Step 1: Match classes that use synchronized and are not @NotThreadSafe :)
+//ClassDeclaration[
+  not(pmd-kotlin:hasAnnotation('NotThreadSafe')
+       or pmd-kotlin:hasAnnotation('net.jcip.annotations.NotThreadSafe'))
+  and (
+    .//FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized') or pmd-kotlin:hasAnnotation('kotlin.jvm.Synchronized')]
+    or .//T-Identifier[@Text='synchronized']
+  )
+]
+(: Step 2: Find var fields that are not guarded :)
+//PropertyDeclaration[
+  not(ancestor::FunctionBody)
+  and not(ancestor::ClassDeclaration[ancestor::ClassBody])
+  and (
+    (: Case 1: var field that is not volatile and not guarded :)
+    T-VAR
+    and not(pmd-kotlin:modifiers()='volatile')
+    and not(pmd-kotlin:hasAnnotation('Volatile') or pmd-kotlin:hasAnnotation('kotlin.jvm.Volatile'))
+    (: not annotated with framework/GuardedBy :)
+    and not(
+         pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
+      or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+      or pmd-kotlin:hasAnnotation('GuardedBy') or pmd-kotlin:hasAnnotation('net.jcip.annotations.GuardedBy')
+           or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy')
+    )
+    (: @Value field excluded if no unguarded assignment elsewhere in the class :)
+    and not(
+      (pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value'))
+      and not(
+        VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//Assignment//T-Identifier[
+          not(ancestor::FunctionDeclaration[
+               pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
+            or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
+            or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
+            or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+          ])
+        ]/@Text
+      )
+    )
+    (: not assigned only in framework-annotated functions :)
+    and not(
+      VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//FunctionDeclaration[
+           pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
+        or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
+        or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+        or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
+        or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+      ]//Assignment//(DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text
+      and not(
+        VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//FunctionDeclaration[not(
+             pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
+          or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
+          or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+          or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
+          or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+        )]//Assignment//(DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text
+      )
+    )
+  )
+  or
+  (
+    (: Case 2: field of known mutable type, even if val :)
+    not(pmd-kotlin:hasAnnotation('GuardedBy') or pmd-kotlin:hasAnnotation('net.jcip.annotations.GuardedBy')
+         or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy'))
+    and (
+      pmd-kotlin:typeIs('java.util.Date')
+      or pmd-kotlin:typeIs('java.lang.StringBuilder')
+      or pmd-kotlin:typeIs('java.lang.StringBuffer')
+      or pmd-kotlin:typeIs('java.net.URL')
+      or pmd-kotlin:typeIs('java.io.File')
+      or pmd-kotlin:typeIs('java.util.ArrayList')
+      or pmd-kotlin:typeIs('java.util.HashMap')
+      or pmd-kotlin:typeIs('java.util.HashSet')
+    )
+  )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad {
+    var date: String = ""  // bad, unguarded var field in class using synchronized
+
+    fun setDate(d: String) {
+        date = d
+    }
+
+    @Synchronized
+    fun getDate(): String = date
+}
+
+class Good {
+    @net.jcip.annotations.GuardedBy("this")
+    var date: String = ""  // good, guarded
+
+    @Synchronized
+    fun getDate(): String = date
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidUnguardedMutableInheritedFieldsInSharedObjects"
+          language="kotlin"
+          message="Mutator method called on inherited field. Avoid unguarded mutable inherited fields in objects shared among threads. Make final immutable or access thread-safely AND use @GuardedBy."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#tutc07">
+        <description>
+            Problem: Multiple threads typically access fields of a singleton or may access fields in session scoped objects. If a (inherited) field or its reference is mutable, access is thread-unsafe and may cause corruption or visibility problems. It may also unintentionally mix-up session data.&#13;
+            Solution: Make the fields val and unmodifiable. If they really need to be mutable, make access thread-safe: use @Synchronized and @GuardedBy or @Volatile.&#13;
+            Notes:&#13;
+            1. Instances of Date, StringBuilder, URL and File are examples of mutable objects and should be avoided (or else guarded) as fields of shared objects.&#13;
+            2. Instances of classes like ArrayList, HashMap and HashSet are also mutable and should be properly wrapped or use thread-safe implementations like ConcurrentHashMap.&#13;
+            3. For autowiring/injection, the assignment of the reference is thread safe, so var is acceptable.&#13;
+            4. In case you are sure the Component is used in single threaded context only, annotate the class with @NotThreadSafe to make this explicit.
+            (jpinpoint-rules)
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="data-mix-up,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Kotlin: AvoidUnguardedMutableInheritedFieldsInSharedObjects :)
+(: Detect mutator calls on inherited fields in singleton classes :)
+
+(: Step 1: Match singleton/shared-object classes :)
+//ClassDeclaration[
+  (
+       pmd-kotlin:hasAnnotation('Service')
+    or pmd-kotlin:hasAnnotation('Component')
+    or pmd-kotlin:hasAnnotation('Controller')
+    or pmd-kotlin:hasAnnotation('Repository')
+    or pmd-kotlin:hasAnnotation('RestController')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Repository')
+    or pmd-kotlin:hasAnnotation('org.springframework.web.bind.annotation.RestController')
+  )
+  (: exclude request/prototype scope :)
+  and not(pmd-kotlin:hasAnnotation('RequestScope')
+       or pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
+  and not(.//Annotation//T-Identifier[@Text='Scope']
+      and .//Annotation//T-LineStrText[@Text='request' or @Text='prototype'])
+  (: exclude @NotThreadSafe :)
+  and not(pmd-kotlin:hasAnnotation('NotThreadSafe')
+       or pmd-kotlin:hasAnnotation('net.jcip.annotations.NotThreadSafe'))
+  (: exclude @ConfigurationProperties unless has Setter annotation :)
+  and not(
+    (pmd-kotlin:hasAnnotation('ConfigurationProperties')
+     or pmd-kotlin:hasAnnotation('org.springframework.boot.context.properties.ConfigurationProperties'))
+    and not(pmd-kotlin:hasAnnotation('Setter') or pmd-kotlin:hasAnnotation('lombok.Setter'))
+  )
+  (: class must have a supertype (extends a class or implements interface) :)
+  and .//DelegationSpecifier
+]
+(: Step 2: Find mutator method calls on inherited (non-local) fields :)
+//PostfixUnaryExpression[
+  (: has a navigation suffix with a mutator method name :)
+  PostfixUnarySuffix/NavigationSuffix[matches(@Identifier, '^(set|put|clear|add|remove|replace)')]
+  (: followed by a call suffix (it's actually a method call) :)
+  and PostfixUnarySuffix/CallSuffix
+  (: the receiver is a simple identifier :)
+  and PrimaryExpression/SimpleIdentifier/T-Identifier[
+    (: not a field declared in this class :)
+    not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
+    (: not a function parameter :)
+    and not(@Text = ancestor::FunctionDeclaration[1]//FunctionValueParameter/Parameter/@Identifier)
+    (: not a local variable :)
+    and not(@Text = ancestor::FunctionBody[1]//PropertyDeclaration/VariableDeclaration/@Identifier)
+  ]
+  (: not inside a @Synchronized function :)
+  and not(ancestor::FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized') or pmd-kotlin:hasAnnotation('kotlin.jvm.Synchronized')])
+  (: not inside a synchronized {} block - check if inside lambda of synchronized() call :)
+  and not(ancestor::LambdaLiteral[
+    ancestor::PostfixUnaryExpression[PrimaryExpression//T-Identifier[@Text='synchronized']]
+  ])
+  (: not inside framework-annotated functions :)
+  and not(ancestor::FunctionDeclaration[
+       pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
+    or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
+    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+  ])
+  (: not in afterPropertiesSet function :)
+  and not(ancestor::FunctionDeclaration[SimpleIdentifier/T-Identifier[@Text='afterPropertiesSet']])
+  (: not in a nested object declaration :)
+  and not(ancestor::ObjectDeclaration[ancestor::ClassBody])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+@org.springframework.stereotype.Component
+class Bad : SomeParent() {
+    fun mutateDateBad() {
+        date.setTime(100) // bad - unguarded mutator on inherited field
+    }
+    fun mutateMapBad(key: String, value: String) {
+        map.put(key, value) // bad - unguarded mutator on inherited field
+    }
+}
+
+@org.springframework.stereotype.Component
+class Good : SomeParent() {
+    @Synchronized
+    fun mutateMapGood(key: String, value: String) {
+        map.put(key, value) // good - synchronized
+    }
+}
+        ]]></example>
+    </rule>
+
 </ruleset>
