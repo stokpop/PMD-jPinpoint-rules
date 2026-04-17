@@ -26,13 +26,14 @@
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: check if at least one java.text imports exists as filter for same named classes in other packages :)
-//ImportHeader[.//T-Identifier[@Text='java'] and .//T-Identifier[@Text='text']][1]/ancestor::KotlinFile
-(: PrimaryExpression finds the constructors instead of type declarations :)
-(: filter matches in functions :)
-//TopLevelObject//PrimaryExpression//SimpleIdentifier//T-Identifier[
- (@Text="DecimalFormat" or @Text="ChoiceFormat")
- and not(ancestor::FunctionBody)
+(: requires kotlin-type-mapper auxClasspath for inferred-type (constructor) coverage :)
+(: also match when declared type is a supertype (e.g. val x: NumberFormat = DecimalFormat(...)) :)
+//PropertyDeclaration[
+    not(ancestor::FunctionBody)
+    and (
+        pmd-kotlin:typeIs('java.text.DecimalFormat') or pmd-kotlin:typeIs('java.text.ChoiceFormat')
+        or Expression//PrimaryExpression[@Identifier='DecimalFormat' or @Identifier='ChoiceFormat']
+    )
 ]
 ]]>
                 </value>
@@ -73,76 +74,66 @@ class Foo {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-//FunctionDeclaration//PostfixUnaryExpression//SimpleIdentifier/T-Identifier[
-    @Text='Regex'
+(: Branch 1: Regex constructor — uses @Identifier on PrimaryExpression; matchesSig has column-range bug on multi-line PUEs :)
+//FunctionDeclaration//PostfixUnaryExpression[PrimaryExpression[@Identifier='Regex']
     (: not called on fun parameter :)
-    and not(ancestor::PostfixUnaryExpression//CallSuffix//PrimaryExpression//T-Identifier[
-        @Text = ancestor::FunctionDeclaration//FunctionValueParameter//Parameter/SimpleIdentifier/T-Identifier/@Text])
-    (: not called on 'dynamic' function call :)
+    and not(.//CallSuffix//PrimaryExpression//T-Identifier[
+        @Text = ancestor::FunctionDeclaration//FunctionValueParameter//Parameter/@Identifier])
+    (: not called on 'dynamic' function call — from outer PUE: chain-call + Regex-call + inner-call = 3 levels :)
     and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/CallSuffix//CallSuffix//CallSuffix)
     (: not if based on local variable initialized by fun parameter :)
-    and not(ancestor::CallSuffix//PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier[
-        @Text = ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration/SimpleIdentifier/T-Identifier/@Text])
+    and not(ancestor::CallSuffix//PostfixUnaryExpression/PrimaryExpression[@Identifier =
+        ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration/@Identifier])
     (: not param in String template in fun parameter :)
-    and not(../../../../PostfixUnaryExpression//CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef[
+    and not(.//CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef[
        @Text = ancestor::FunctionDeclaration//Parameter/SimpleIdentifier/T-Identifier/concat('$', @Text)])
     (: not param in String template of class var field :)
-    and not(../../../../PostfixUnaryExpression//CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef[
+    and not(.//CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef[
        @Text = ancestor::ClassDeclaration//PropertyDeclaration[T-VAR]//SimpleIdentifier/T-Identifier/concat('$', @Text)])
     (: not param in String concatenation of class var field :)
-    and not(../../../../PostfixUnaryExpression//CallSuffix/ValueArguments/ValueArgument[//LineStringLiteral]//AdditiveExpression/MultiplicativeExpression//SimpleIdentifier/T-Identifier[
-       @Text = ancestor::ClassDeclaration//PropertyDeclaration[T-VAR]//SimpleIdentifier/T-Identifier/@Text])
+    and not(.//CallSuffix/ValueArguments/ValueArgument[//LineStringLiteral]//AdditiveExpression/MultiplicativeExpression//SimpleIdentifier/T-Identifier[
+       @Text = ancestor::ClassDeclaration//PropertyDeclaration[T-VAR]//VariableDeclaration/@Identifier])
 ]
 
 |
 
-//FunctionDeclaration//PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[
-    @Text='toRegex'
+(: Branch 2: .toRegex() — using @Identifier; matchesSig FQCN for kotlin.text.StringsKt#toRegex needs verification :)
+//FunctionDeclaration//PostfixUnaryExpression[
+    PostfixUnarySuffix/NavigationSuffix[@Identifier='toRegex']
     (: not called on function parameter :)
-    and not(../../../../PrimaryExpression//T-Identifier[
-        @Text = ancestor::FunctionDeclaration//FunctionValueParameter//Parameter/SimpleIdentifier/T-Identifier/@Text])
+    and not(PrimaryExpression[@Identifier = ancestor::FunctionDeclaration//FunctionValueParameter//Parameter/@Identifier])
     (: not called on 'dynamic' function call :)
-    and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix[1]/CallSuffix)
+    and not(PostfixUnarySuffix[1]/CallSuffix)
     (: not if based on local variable initialized by fun parameter :)
-    and not(../../../../../PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier[
-        @Text = ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration/SimpleIdentifier/T-Identifier/@Text])
+    and not(PrimaryExpression[@Identifier = ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration/@Identifier])
 ]
 
 |
 
-(: check if java.util.regex.Pattern import exists as filter for same named classes in other packages :)
-//ImportHeader[
-    (.//T-Identifier[@Text='java'] and .//T-Identifier[@Text='util'] and .//T-Identifier[@Text='regex'] and .//T-Identifier[@Text='Pattern'] or .//T-MULT)
-  ][1]/ancestor::KotlinFile
-//SimpleIdentifier/T-Identifier[@Text='Pattern'
-    and ../../../PostfixUnarySuffix//T-Identifier[@Text='matches']
+(: Branch 3: Pattern.matches — uses @Identifier; import filter replaced by distinctive class name :)
+//PostfixUnaryExpression[PrimaryExpression[@Identifier='Pattern']
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier='matches']
     (: not if first param is fun parameter :)
-    and not(../../../PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument[1]//SimpleIdentifier/T-Identifier[
-        @Text = ancestor::FunctionDeclaration//Parameter/SimpleIdentifier/T-Identifier/@Text])
+    and not(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument[1]//SimpleIdentifier/T-Identifier[
+        @Text = ancestor::FunctionDeclaration//Parameter/@Identifier])
 ]
 
 |
 
-(: check if java.nio.file.FileSystems or java.nio.file.Path imports exists as filter for same named classes in other packages :)
-(: TODO is this a bug: having to use T-FILE for 'file' :)
-//ImportHeader[
-    (.//T-Identifier[@Text='java']
-        and .//T-Identifier[@Text='nio'] and .//T-FILE[@Text='file'] and .//T-Identifier[@Text='FileSystems' or @Text='Path'] or .//T-MULT)
-  ][1]/ancestor::KotlinFile
-(: added [ancestor::NavigationSuffix] to avoid PAT_STRING param from being selected too :)
-//FunctionDeclaration//PostfixUnarySuffix//T-Identifier[ancestor::NavigationSuffix][@Text='getPathMatcher'
-    and (ancestor::PostfixUnaryExpression/PrimaryExpression//T-Identifier[@Text=
-              ancestor::Statement/preceding-sibling::Statement//VariableDeclaration[../Expression//T-Identifier[@Text='FileSystems']]//T-Identifier/@Text]
-         or ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='FileSystems']
-
+(: Branch 4: FileSystem.getPathMatcher — navigate to T-Identifier leaf to report correct line for multi-line chains :)
+//FunctionDeclaration//PostfixUnaryExpression[
+    (PrimaryExpression[@Identifier='FileSystems']
+     or PrimaryExpression[@Identifier =
+          ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration[..//Expression//PrimaryExpression[@Identifier='FileSystems']]/@Identifier]
     )
+]/PostfixUnarySuffix/NavigationSuffix[@Identifier='getPathMatcher'
     (: not if first param is fun parameter :)
-    and not(ancestor::PrefixUnaryExpression//CallSuffix/ValueArguments/ValueArgument//SimpleIdentifier/T-Identifier[
-       @Text = ancestor::FunctionDeclaration//Parameter/SimpleIdentifier/T-Identifier/@Text])
+    and not(../following-sibling::PostfixUnarySuffix[1]/CallSuffix/ValueArguments/ValueArgument[1]//SimpleIdentifier/T-Identifier[
+        @Text = ancestor::FunctionDeclaration//Parameter/@Identifier])
     (: not param in String template in fun parameter :)
-    and not(ancestor::PrefixUnaryExpression//CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef[
-       @Text = ancestor::FunctionDeclaration//Parameter/SimpleIdentifier/T-Identifier/concat('$', @Text)])
-]
+    and not(../following-sibling::PostfixUnarySuffix[1]/CallSuffix/ValueArguments/ValueArgument[1]//LineStringContent/T-LineStrRef[
+        @Text = ancestor::FunctionDeclaration//Parameter/SimpleIdentifier/T-Identifier/concat('$', @Text)])
+]/SimpleIdentifier/T-Identifier[@Text='getPathMatcher']
                 ]]></value>
             </property>
         </properties>
@@ -227,21 +218,31 @@ class AvoidInMemoryStreamingDefaultConstructor {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-//FunctionBody[count(.//Assignment[.//(AssignmentAndOperator/T-ADD_ASSIGNMENT|AdditiveOperator/T-ADD)]/(AssignableExpression|DirectlyAssignableExpression)//T-Identifier[@Text=
-(: property a string literal :)
-ancestor::FunctionBody//PropertyDeclaration[(
-    Expression[not(.//Expression)]//StringLiteral or
-    (: or explicit type String:)
-    VariableDeclaration/Type//T-Identifier[@Text='String'] or
-    (: or assigned parameter of type String :)
-    Expression[.//T-Identifier[@Text = ancestor::FunctionDeclaration/FunctionValueParameters/FunctionValueParameter[Parameter/Type//T-Identifier[@Text='String']]//T-Identifier/@Text]] or
-    (: or assigned non-nested function of explicit type String :) (: known issue: ignores parameters, may give false positives with overloaded methods :)
-    Expression[.//T-Identifier[not(ancestor::CallSuffix)][@Text = ancestor::ClassMemberDeclarations//FunctionDeclaration[Type//T-Identifier[@Text='String']]//T-Identifier/@Text]]
-)]
-/VariableDeclaration//T-Identifier/@Text]) > 1]
+//FunctionBody[
+  count(
+    .//Assignment[
+      .//(AssignmentAndOperator/T-ADD_ASSIGNMENT|AdditiveOperator/T-ADD)
+      and
+      (AssignableExpression|DirectlyAssignableExpression)//T-Identifier[
+        (: property a string literal :)
+        @Text = ancestor::FunctionBody//PropertyDeclaration[
+          (
+            Expression[not(.//Expression)]//StringLiteral
+            (: explicit type String:)
+            or VariableDeclaration/Type//T-Identifier[@Text='String']
+            (: assigned parameter of type String :)
+            or Expression[.//T-Identifier[@Text = ancestor::FunctionDeclaration/FunctionValueParameters/FunctionValueParameter[Parameter/Type//T-Identifier[@Text='String']]//T-Identifier/@Text]]
+            (: assigned non-nested function of explicit type String :) (: known issue: ignores parameters, may give false positives with overloaded methods :)
+            or Expression[.//T-Identifier[not(ancestor::CallSuffix)][@Text = ancestor::ClassMemberDeclarations//FunctionDeclaration[Type//T-Identifier[@Text='String']]//T-Identifier/@Text]]
+          )
+          and not(Expression//T-Identifier[@Text='toMutableList'])
+        ]/VariableDeclaration//T-Identifier/@Text
+      ]
+    ]
+  ) > 1
+]
 //Statement[Assignment//(T-ADD_ASSIGNMENT|T-ADD)][position()=last()]
-
-	]]></value>
+                ]]></value>
             </property>
         </properties>
         <example>
@@ -262,19 +263,19 @@ ancestor::FunctionBody//PropertyDeclaration[(
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: check if java.util.regex imports exists as filter for same named classes in other packages :)
-//ImportHeader[.//T-Identifier[@Text='java'] and .//T-Identifier[@Text='util'] and .//T-Identifier[@Text='regex']][1]/ancestor::KotlinFile
-
-//FunctionBody//T-Identifier[@Text='Pattern' and ../../../PostfixUnarySuffix//T-Identifier[@Text='compile']
+(: requires kotlin-type-mapper auxClasspath; matchesSig replaces import filter :)
+(: deduplication: only match innermost PUE — avoids column-range false positives on outer chain PUEs :)
+//FunctionBody//PostfixUnaryExpression[pmd-kotlin:matchesSig('java.util.regex.Pattern#compile(*)')
+    and not(.//PostfixUnaryExpression[pmd-kotlin:matchesSig('java.util.regex.Pattern#compile(*)')])
 (: check for variables $action or ${action} in String of compile() call (first in possible call chain): allow dynamic input :)
-and not(
-  let $params := ancestor::FunctionDeclaration//FunctionValueParameter/Parameter/SimpleIdentifier/T-Identifier/@Text
-  return
-    ((../../..//ValueArgument)[1]//PostfixUnaryExpression//T-Identifier | (../../..//ValueArgument)[1]//T-LineStrRef)[
-      @Text = $params
-      or (some $x in $params satisfies @Text = concat('$', $x))
-    ]
-)
+    and not(
+        let $params := ancestor::FunctionDeclaration//FunctionValueParameter/Parameter/@Identifier
+        return
+            ((.//ValueArgument)[1]//PostfixUnaryExpression//T-Identifier | (.//ValueArgument)[1]//T-LineStrRef)[
+                @Text = $params
+                or (some $x in $params satisfies @Text = concat('$', $x))
+            ]
+    )
 ]
 ]]>
                 </value>
@@ -321,11 +322,19 @@ internal object Good {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-//ImportHeader[.//T-Identifier[@Text='javax'] and .//T-Identifier[@Text='xml'] and .//T-Identifier[@Text='xpath']]/ancestor::KotlinFile
-//FunctionBody//T-Identifier[@Text='newXPath']
-/ancestor::FunctionBody//T-Identifier[@Text='compile'
-or (@Text='evaluate' and ancestor::PostfixUnarySuffix/..//ValueArguments[count(./ValueArgument) = 3])]
-(: note on limitation, the 2-argument version is not found, difficult to do the typeIs checking like in Java :)
+(: requires kotlin-type-mapper auxClasspath; matchesSig replaces import filter :)
+//FunctionBody[.//PostfixUnaryExpression[pmd-kotlin:matchesSig('javax.xml.xpath.XPathFactory#newXPath()')]]
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('javax.xml.xpath.XPath#compile(*)')
+     or pmd-kotlin:matchesSig('javax.xml.xpath.XPath#evaluate(_,_,_)')
+    )
+    (: deduplication: only match innermost PUE — avoids column-range false positives :)
+    and not(.//PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('javax.xml.xpath.XPath#compile(*)')
+        or pmd-kotlin:matchesSig('javax.xml.xpath.XPath#evaluate(_,_,_)')
+    ])
+]
+(: note on limitation: the 2-argument evaluate variant is not detected :)
 ]]></value>
             </property>
         </properties>
@@ -388,7 +397,7 @@ object GoodAvoidRecompilingXPathExpressionKt {
             <property name="xpath">
                 <value>
                     <![CDATA[
-(: check if java.time.format or org.joda.time.format imports exists as filter for same named classes in other packages :)
+(: check if java.time.format or org.joda.time.format imports exist as filter for same named classes in other packages :)
 //ImportHeader[
     (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='joda'] and .//T-Identifier[@Text='time'] and .//T-Identifier[@Text='format'])
     or (.//T-Identifier[@Text='java'] and .//T-Identifier[@Text='time'] and .//T-Identifier[@Text='format'])
@@ -403,9 +412,9 @@ object GoodAvoidRecompilingXPathExpressionKt {
      (: do not match explicit type declarations :)
      and not(ancestor::TypeReference)
      (: variable params are allowed, e.g. when it is an incoming function param :)
-     and not(ancestor::PrefixUnaryExpression//ValueArgument[.//T-Identifier[@Text = ancestor::FunctionDeclaration/FunctionValueParameters/FunctionValueParameter/Parameter/SimpleIdentifier/T-Identifier/@Text]])
+     and not(ancestor::PrefixUnaryExpression//ValueArgument[.//T-Identifier[@Text = ancestor::FunctionDeclaration/FunctionValueParameters/FunctionValueParameter/Parameter/@Identifier]])
      (: variable class params are allowed in val fields :)
-     and (not(ancestor::PropertyDeclaration/T-VAL) or not(ancestor::PrefixUnaryExpression//ValueArgument[.//T-Identifier[@Text = ancestor::ClassDeclaration//ClassParameters/ClassParameter/SimpleIdentifier/T-Identifier/@Text]])
+     and (not(ancestor::PropertyDeclaration/T-VAL) or not(ancestor::PrefixUnaryExpression//ValueArgument[.//T-Identifier[@Text = ancestor::ClassDeclaration//ClassParameters/ClassParameter/@Identifier]])
      (: not when like DateTimeFormatter.ISO_DATE_TIME :)
      and (not(ancestor::PostfixUnaryExpression[count(PostfixUnarySuffix) = 1]))
     )
@@ -421,9 +430,9 @@ object GoodAvoidRecompilingXPathExpressionKt {
      (: check if variable function params in init constructor with two params :)
      and ancestor::PostfixUnaryExpression/PostfixUnarySuffix//ValueArguments[
            count(ValueArgument) = 2
-           and count(./ValueArgument//T-Identifier[@Text = ancestor::FunctionDeclaration/FunctionValueParameters/FunctionValueParameter/Parameter/SimpleIdentifier/T-Identifier/@Text]) = 2
+           and count(./ValueArgument//T-Identifier[@Text = ancestor::FunctionDeclaration/FunctionValueParameters/FunctionValueParameter/Parameter/@Identifier]) = 2
            (: check if variable is a var :)
-           and ancestor::Statement/Assignment//T-Identifier[@Text = ancestor::ClassBody//VariableDeclaration//T-Identifier[ancestor::PropertyDeclaration/T-VAR]/@Text]
+           and ancestor::Statement/Assignment//T-Identifier[@Text = ancestor::ClassBody//VariableDeclaration[../T-VAR]/@Identifier]
      ]
 ]
 ]]>
@@ -463,15 +472,24 @@ class Good {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: check if java.text imports exists as filter for same named classes in other packages :)
-//ImportHeader[.//T-Identifier[@Text='java'] and .//T-Identifier[@Text='text']][1]/../..
-
-(: if used in setDateFormat function, allow if jackson ObjectMapper or XmlMapper is used :)
-//ClassMemberDeclaration//SimpleIdentifier//T-Identifier[(@Text="SimpleDateFormat")
-  and not (ancestor::ClassMemberDeclaration//T-Identifier[@Text="setDateFormat"]
-              and //ImportHeader[.//T-Identifier[@Text='fasterxml'] and .//T-Identifier[@Text='jackson']]
-          )
+(: branch 1: typeIs for PropertyDeclarations where type is declared/inferred as SimpleDateFormat :)
+//PropertyDeclaration[
+    pmd-kotlin:typeIs('java.text.SimpleDateFormat')
+    and not(ancestor::ClassMemberDeclaration[
+        .//NavigationSuffix[@Identifier='setDateFormat']
+        and //ImportHeader[.//T-Identifier[@Text='fasterxml'] and .//T-Identifier[@Text='jackson']]
+    ])
 ]
+|
+(: branch 2: direct constructor use (not as property declaration) with import filter :)
+(//ImportHeader[.//T-Identifier[@Text='java'] and .//T-Identifier[@Text='text']])[1]/../..//ClassMemberDeclaration
+    //T-Identifier[@Text='SimpleDateFormat'
+        and not(ancestor::PropertyDeclaration)
+        and not(ancestor::ClassMemberDeclaration[
+            .//NavigationSuffix[@Identifier='setDateFormat']
+            and //ImportHeader[.//T-Identifier[@Text='fasterxml'] and .//T-Identifier[@Text='jackson']]
+        ])
+    ]
                 ]]></value>
             </property>
         </properties>
@@ -500,8 +518,11 @@ class Foo {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-//VariableDeclaration/Type//T-Identifier[@Text='StringBuffer'],
-//Declaration//PrimaryExpression//T-Identifier[@Text='StringBuffer']
+(: requires kotlin-type-mapper auxClasspath for inferred-type (constructor) coverage :)
+//PropertyDeclaration[pmd-kotlin:typeIs('java.lang.StringBuffer')]
+|
+(: fallback: explicit type declaration e.g. var fieldSb: StringBuffer? = null :)
+//PropertyDeclaration[.//TypeReference//T-Identifier[@Text='StringBuffer']]
 ]]>
                 </value>
             </property>
@@ -535,14 +556,13 @@ class AvoidStringBuffer {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: check if javax.xml.xpath imports exists as filter for same named classes in other packages :)
-//ImportHeader[.//T-Identifier[@Text='javax'] and .//T-Identifier[@Text='xml'] and .//T-Identifier[@Text='xpath']][1]/../..
-
-(: if 'compile' method exists with one parameter of String literal with first chars '//' :)
-//ClassMemberDeclaration//SimpleIdentifier//T-Identifier[(@Text="compile")
-  and ancestor::Expression//ValueArguments[count(./ValueArgument) = 1]/ValueArgument//PrimaryExpression/StringLiteral//T-LineStrText[starts-with(@Text, '//')]
-]
-	]]></value>
+(: matchesSig for javax.xml.xpath.XPath#compile; report at the T-Identifier token (line of .compile) not the full expression start :)
+//ClassMemberDeclaration
+    //PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('javax.xml.xpath.XPath#compile(_)')
+        and (.//ValueArgument)[1]//T-LineStrText[starts-with(@Text, '//')]
+    ]
+    /PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='compile']]]></value>
             </property>
         </properties>
         <example><![CDATA[
@@ -580,8 +600,8 @@ class Foo {
             <!--property name="tag" value="performance" type="String" description="for-sonar"/-->
             <property name="xpath">
                 <value><![CDATA[
-//ImportHeader[.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='xpath']][1]/ancestor::KotlinFile
-//ClassBody//SimpleIdentifier/T-Identifier[@Text='XPathAPI']
+(: XPathAPI is highly specific; @Identifier replaces import filter + SimpleIdentifier/T-Identifier traversal :)
+//ClassBody//PrimaryExpression[@Identifier='XPathAPI']
 	]]></value>
             </property>
         </properties>
@@ -627,32 +647,26 @@ class FooGood {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: Only consider files that import org.slf4j.MDC :)
-//ImportHeader[.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='slf4j'] and .//T-Identifier[@Text='MDC']][1]/ancestor::KotlinFile
-
-(: Select calls to MDC.put(..) :)
-//PostfixUnaryExpression[
-  PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='MDC']
-  and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='put']
-]
-(: Report the 'put' identifier if there is no MDC.remove(..) or MDC.clear() in same function, nor via a method called from a finally block (Issue #653) :)
-/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='put'
+(: Select calls to MDC.put(..) - pmd-kotlin:matchesSig identifies org.slf4j.MDC precisely :)
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.slf4j.MDC#put(*)')]
+(: Report at T-Identifier leaf of 'put' NavigationSuffix for correct line on multi-line chains (NavigationSuffix inherits parent PUE line) :)
+/PostfixUnarySuffix/NavigationSuffix[@Identifier='put'
   and not(
       (: same function body has direct MDC.remove/clear :)
       ancestor::FunctionBody//PostfixUnaryExpression[
-          PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='MDC']
-          and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text=('remove','clear')]
+          PrimaryExpression[@Identifier='MDC']
+          and PostfixUnarySuffix/NavigationSuffix[@Identifier=('remove','clear')]
       ]
       or
       (
         (: put-arg text equals any remove-arg text inside a helper method that is called from a finally block in this class :)
         ancestor::ClassDeclaration
           //FunctionDeclaration[
-            SimpleIdentifier/T-Identifier/@Text = ancestor::ClassDeclaration//TryExpression//FinallySection//PostfixUnaryExpression[PostfixUnarySuffix/CallSuffix]//PrimaryExpression/SimpleIdentifier/T-Identifier/@Text
+            @Identifier = ancestor::ClassDeclaration//TryExpression//FinallySection//PostfixUnaryExpression[PostfixUnarySuffix/CallSuffix]//PrimaryExpression/@Identifier
           ]
           //PostfixUnaryExpression[
-            PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='MDC']
-            and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='remove']
+            PrimaryExpression[@Identifier='MDC']
+            and PostfixUnarySuffix/NavigationSuffix[@Identifier='remove']
           ]/PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument[1]//(SimpleIdentifier/T-Identifier|LineStringLiteral//T-LineStrText)/@Text
         =
         ancestor::PostfixUnaryExpression/PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument[1]//(SimpleIdentifier/T-Identifier|LineStringLiteral//T-LineStrText)/@Text
@@ -662,19 +676,19 @@ class FooGood {
         (: helper method called from finally does MDC.clear() :)
         ancestor::ClassDeclaration
           //FunctionDeclaration[
-            SimpleIdentifier/T-Identifier/@Text = ancestor::ClassDeclaration//TryExpression//FinallySection//PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text
+            @Identifier = ancestor::ClassDeclaration//TryExpression//FinallySection//PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/@Identifier
           ]
           //PostfixUnaryExpression[
-            PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='MDC']
-            and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='clear']
+            PrimaryExpression[@Identifier='MDC']
+            and PostfixUnarySuffix/NavigationSuffix[@Identifier='clear']
           ]
       )
       or
       (
         (: looser, anywhere in class: a remove of same key exists :)
         ancestor::ClassDeclaration//PostfixUnaryExpression[
-           PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='MDC']
-           and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='remove']
+           PrimaryExpression[@Identifier='MDC']
+           and PostfixUnarySuffix/NavigationSuffix[@Identifier='remove']
         ]/PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument[1]//(SimpleIdentifier/T-Identifier|LineStringLiteral//T-LineStrText)/@Text
         =
         ancestor::PostfixUnaryExpression/PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument[1]//(SimpleIdentifier/T-Identifier|LineStringLiteral//T-LineStrText)/@Text
@@ -683,12 +697,12 @@ class FooGood {
       (
         (: looser, anywhere in class: a clear exists :)
         ancestor::ClassDeclaration//PostfixUnaryExpression[
-           PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='MDC']
-           and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='clear']
+           PrimaryExpression[@Identifier='MDC']
+           and PostfixUnarySuffix/NavigationSuffix[@Identifier='clear']
         ]
       )
   )
-]
+]/SimpleIdentifier/T-Identifier[@Text='put']
 ]]></value>
             </property>
         </properties>
@@ -715,6 +729,32 @@ class GoodKotlinMdc {
         ]]></example>
     </rule>
 
+    <rule name="UnresolvedType"
+          language="kotlin"
+          message="A type cannot be resolved. Make sure all dependencies are available on the classpath."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodeQuality.md#M04">
+        <description>Problem: When analyzing Kotlin code, a type reference could not be resolved. This typically means a dependency is missing from the analysis classpath. Several rules (using typeIs, matchesSig) depend on type information; without it they may produce false positives or miss violations.
+            Solution: Make sure all dependencies are available on the auxiliary classpath (--aux-classpath). Compile all source code before running PMD. Note: this rule requires kotlin-type-mapper for type resolution.
+        (jpinpoint-rules)</description>
+        <priority>5</priority>
+        <properties>
+            <property name="tags" value="confusing,jpinpoint-rule" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//ImportHeader[pmd-kotlin:hasUnresolvedReference()]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import com.missing.dependency.SomeClass // bad - 'SomeClass' dependency not on classpath
+
+import java.util.List // good - java.util is always available
+            ]]>
+        </example>
+    </rule>
+
 <!-- END Included file 'common.xml' -->
 <!-- BEGIN Included file 'remoting.xml' -->
     <rule name="AvoidDeprecatedHystrix"
@@ -729,7 +769,7 @@ class GoodKotlinMdc {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: check if javax.xml.xpath imports exists as filter for same named classes in other packages :)
+(: TODO: replace with pmd-kotlin:hasImport('com.netflix.hystrix.*') once that function is implemented :)
 //ImportHeader[.//T-Identifier[@Text='com'] and .//T-Identifier[@Text='netflix'] and .//T-Identifier[@Text='hystrix']][1]/../..
 ]]>
                 </value>
@@ -755,17 +795,17 @@ class GoodKotlinMdc {
             <property name="xpath">
                 <value><![CDATA[
 (:locally created http client builder without disableConnectionState :)
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[@Text="custom"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="HttpClients"
-  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="disableConnectionState")]
+//PostfixUnarySuffix//NavigationSuffix[@Identifier="custom"
+  and ancestor::PostfixUnaryExpression/PrimaryExpression/@Identifier="HttpClients"
+  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/@Identifier="disableConnectionState")]
 ,
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[@Text="create"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier[(@Text="HttpClientBuilder" or @Text="HttpAsyncClientBuilder")
-  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="disableConnectionState")]]
+//PostfixUnarySuffix//NavigationSuffix[@Identifier="create"
+  and ancestor::PostfixUnaryExpression/PrimaryExpression[(@Identifier="HttpClientBuilder" or @Identifier="HttpAsyncClientBuilder")
+  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/@Identifier="disableConnectionState")]]
 ,
 (: method param http client builder without disableConnectionState :)
-//FunctionValueParameter/Parameter/Type/TypeReference/UserType/SimpleUserType/SimpleIdentifier/T-Identifier[(@Text="HttpClients" or @Text="HttpClientBuilder" or @Text="HttpAsyncClientBuilder")
-  and not(ancestor::FunctionDeclaration//PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="disableConnectionState")]
+//FunctionValueParameter/Parameter/Type/TypeReference/UserType/SimpleUserType[(@Identifier="HttpClients" or @Identifier="HttpClientBuilder" or @Identifier="HttpAsyncClientBuilder")
+  and not(ancestor::FunctionDeclaration//PostfixUnarySuffix/NavigationSuffix/@Identifier="disableConnectionState")]
 ]]>
                 </value>
             </property>
@@ -802,62 +842,48 @@ class GoodKotlinMdc {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: check if Apache HttpClient v4 or v5 imports exist to avoid name clashes :)
-//ImportHeader[
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='http'])
-  or
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='hc'] and .//T-Identifier[@Text='client5'])
-][1]/ancestor::KotlinFile
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[
-  @Text='custom' and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text='HttpClients'
+(: import filters dropped - Apache HttpClient class names are distinctive; @Identifier replaces T-Identifier traversal :)
+//PostfixUnaryExpression[
+    PrimaryExpression[@Identifier='HttpClients']
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier='custom']
 ][
-  ancestor::FunctionDeclaration[
-    not(.//SimpleIdentifier/T-Identifier[@Text='setConnectionManager'] or
-        (.//SimpleIdentifier/T-Identifier[@Text='setMaxConnTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setMaxConnPerRoute'])
-    )
-  ]
+    ancestor::FunctionDeclaration[
+        not(.//NavigationSuffix[@Identifier='setConnectionManager']
+            or (.//NavigationSuffix[@Identifier='setMaxConnTotal'] and .//NavigationSuffix[@Identifier='setMaxConnPerRoute']))
+    ]
 ]
 |
-//ImportHeader[
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='http'])
-  or
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='hc'] and .//T-Identifier[@Text='client5'])
-][1]/ancestor::KotlinFile
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[
-  @Text='create' and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='HttpClientBuilder' or @Text='HttpAsyncClientBuilder']
+//PostfixUnaryExpression[
+    PrimaryExpression[(@Identifier='HttpClientBuilder' or @Identifier='HttpAsyncClientBuilder')]
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier='create']
 ][
-  ancestor::FunctionDeclaration[
-    not(.//SimpleIdentifier/T-Identifier[@Text='setConnectionManager'] or
-        (.//SimpleIdentifier/T-Identifier[@Text='setMaxConnTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setMaxConnPerRoute'])
-    )
-  ]
+    ancestor::FunctionDeclaration[
+        not(.//NavigationSuffix[@Identifier='setConnectionManager']
+            or (.//NavigationSuffix[@Identifier='setMaxConnTotal'] and .//NavigationSuffix[@Identifier='setMaxConnPerRoute']))
+    ]
 ]
 |
-//ImportHeader[
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='http'])
-  or
-  (.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='hc'] and .//T-Identifier[@Text='client5'])
-][1]/ancestor::KotlinFile
-//FunctionDeclaration//TypeReference//SimpleIdentifier/T-Identifier[@Text='PoolingHttpClientConnectionManager' or @Text='PoolingAsyncClientConnectionManager']
-[
-  ancestor::FunctionDeclaration[
-    not(
-      (.//SimpleIdentifier/T-Identifier[@Text='setMaxTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setDefaultMaxPerRoute'])
-      or (
-        (.//SimpleIdentifier/T-Identifier[@Text='setMaxConnTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setMaxConnPerRoute'])
-        and .//SimpleIdentifier/T-Identifier[@Text='PoolingHttpClientConnectionManagerBuilder']
-      )
-    )
-    and not(
-      ancestor::ClassBody//FunctionDeclaration[
-        (.//SimpleIdentifier/T-Identifier[@Text='setMaxTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setDefaultMaxPerRoute'])
-        or (
-          (.//SimpleIdentifier/T-Identifier[@Text='setMaxConnTotal'] and .//SimpleIdentifier/T-Identifier[@Text='setMaxConnPerRoute'])
-          and .//SimpleIdentifier/T-Identifier[@Text='PoolingHttpClientConnectionManagerBuilder']
+//FunctionDeclaration//TypeReference//SimpleUserType[
+    @Identifier='PoolingHttpClientConnectionManager' or @Identifier='PoolingAsyncClientConnectionManager'
+][
+    ancestor::FunctionDeclaration[
+        not(
+            (.//NavigationSuffix[@Identifier='setMaxTotal'] and .//NavigationSuffix[@Identifier='setDefaultMaxPerRoute'])
+            or (
+                (.//NavigationSuffix[@Identifier='setMaxConnTotal'] and .//NavigationSuffix[@Identifier='setMaxConnPerRoute'])
+                and .//PrimaryExpression[@Identifier='PoolingHttpClientConnectionManagerBuilder']
+            )
         )
-      ]
-    )
-  ]
+        and not(
+            ancestor::ClassBody//FunctionDeclaration[
+                (.//NavigationSuffix[@Identifier='setMaxTotal'] and .//NavigationSuffix[@Identifier='setDefaultMaxPerRoute'])
+                or (
+                    (.//NavigationSuffix[@Identifier='setMaxConnTotal'] and .//NavigationSuffix[@Identifier='setMaxConnPerRoute'])
+                    and .//PrimaryExpression[@Identifier='PoolingHttpClientConnectionManagerBuilder']
+                )
+            ]
+        )
+    ]
 ]
                 ]]></value>
             </property>
@@ -897,46 +923,47 @@ fun goodWithSizes(): HttpClient =
             <property name="tags" value="io,jpinpoint-rule,performance,pitfall,resilience" type="String" description="classification"/>
             <property name="xpath">
                 <value><![CDATA[
-(: v4/v5 builders without setDefaultRequestConfig :)
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[@Text="create"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="HttpClientBuilder"
-  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="setDefaultRequestConfig")]
-,
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[@Text="create"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="HttpAsyncClientBuilder"
-  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="setDefaultRequestConfig")]
-,
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[@Text="custom"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="HttpClients"
-  and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="setDefaultRequestConfig")]
-,
-(: v4 RequestConfig missing at least one of the three timeouts:)
-//ImportHeader[.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='http'] and .//T-Identifier[@Text='client'] and .//T-Identifier[@Text='config'] and .//T-Identifier[@Text='RequestConfig']][1]/ancestor::KotlinFile
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[
-  @Text="custom"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="RequestConfig"
-  and not(
-    count(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text=('setConnectionRequestTimeout','setConnectTimeout','setSocketTimeout')]/@Text) = 3
-  )
+(: v4/v5 builders without setDefaultRequestConfig - @Identifier replaces SimpleIdentifier/T-Identifier traversal :)
+//PostfixUnaryExpression[
+    PrimaryExpression[@Identifier="HttpClientBuilder"]
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier="create"]
+    and not(.//NavigationSuffix[@Identifier="setDefaultRequestConfig"])
 ]
 ,
-(: v5 RequestConfig missing at least one of the two timeouts:)
-//ImportHeader[.//T-Identifier[@Text='org'] and .//T-Identifier[@Text='apache'] and .//T-Identifier[@Text='hc'] and .//T-Identifier[@Text='client5'] and .//T-Identifier[@Text='http'] and .//T-Identifier[@Text='config'] and .//T-Identifier[@Text='RequestConfig']][1]/ancestor::KotlinFile
-//PostfixUnarySuffix//SimpleIdentifier/T-Identifier[
-  @Text="custom"
-  and ancestor::PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text="RequestConfig"
-  and not(
-    ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="setConnectionRequestTimeout"
-    and ancestor::PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier/@Text="setResponseTimeout"
-  )
+//PostfixUnaryExpression[
+    PrimaryExpression[@Identifier="HttpAsyncClientBuilder"]
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier="create"]
+    and not(.//NavigationSuffix[@Identifier="setDefaultRequestConfig"])
+]
+,
+//PostfixUnaryExpression[
+    PrimaryExpression[@Identifier="HttpClients"]
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier="custom"]
+    and not(.//NavigationSuffix[@Identifier="setDefaultRequestConfig"])
+]
+,
+(: v4 RequestConfig missing at least one of the three timeouts - requires kotlin-type-mapper auxClasspath; matchesSig replaces import filter :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.apache.http.client.config.RequestConfig#custom()')
+    and not(
+        count(PostfixUnarySuffix/NavigationSuffix[@Identifier=('setConnectionRequestTimeout','setConnectTimeout','setSocketTimeout')]) = 3
+    )
+]
+,
+(: v5 RequestConfig missing at least one of the two timeouts - requires kotlin-type-mapper auxClasspath; matchesSig replaces import filter :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.apache.hc.client5.http.config.RequestConfig#custom()')
+    and not(
+        PostfixUnarySuffix/NavigationSuffix[@Identifier='setConnectionRequestTimeout']
+        and PostfixUnarySuffix/NavigationSuffix[@Identifier='setResponseTimeout']
+    )
 ]
 ,
 (: Spring HttpComponentsClientHttpRequestFactory missing full timeout configuration in a function :)
-//SimpleIdentifier/T-Identifier[@Text='HttpComponentsClientHttpRequestFactory'
-  and ancestor::FunctionDeclaration[
-    count(.//SimpleIdentifier/T-Identifier[@Text=('setConnectTimeout', 'setConnectionRequestTimeout', 'setReadTimeout')]) < 3
-  ]
-]
+//FunctionDeclaration[
+    .//PrimaryExpression[@Identifier='HttpComponentsClientHttpRequestFactory']
+    and count(.//NavigationSuffix[@Identifier=('setConnectTimeout', 'setConnectionRequestTimeout', 'setReadTimeout')]) < 3
+]/(.//PrimaryExpression[@Identifier='HttpComponentsClientHttpRequestFactory'])[1]
 ]]>
                 </value>
             </property>
@@ -996,11 +1023,16 @@ class GoodHttpClientV5 {
             <property name="tags" value="io,jpinpoint-rule,performance,sustainability-low,resilience" type="String" description="classification"/>
             <property name="xpath">
                 <value><![CDATA[
-//ImportHeader[
-  .//T-Identifier[@Text='reactor'] and .//T-Identifier[@Text='netty'] and .//T-Identifier[@Text='resources']
-][1]/ancestor::KotlinFile
-  //FunctionBody//Statement//T-Identifier[@Text='ConnectionProvider']/../../..//T-Identifier[@Text='builder']
-    [not(ancestor::Statement//T-Identifier[@Text='maxConnections']) or not (ancestor::Statement//T-Identifier[@Text='pendingAcquireTimeout'])]
+(: import filter dropped - ConnectionProvider/reactor-netty class name is distinctive; @Identifier and matchesSig :)
+(: requires kotlin-type-mapper auxClasspath for matchesSig on reactor.netty.resources.ConnectionProvider :)
+//FunctionBody//PostfixUnaryExpression[
+    PrimaryExpression[@Identifier='ConnectionProvider']
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier='builder']
+    and (
+        not(.//NavigationSuffix[@Identifier='maxConnections'])
+        or not(.//NavigationSuffix[@Identifier='pendingAcquireTimeout'])
+    )
+]
                 ]]></value>
             </property>
         </properties>
