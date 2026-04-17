@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>violation: unguarded assignment to var fields in @Service</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>10, 11</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.stereotype.Service
+import org.springframework.beans.factory.annotation.Value
+
+@Service
+class AService {
+    @Value("\${batchService.http.url}")
+    var url: String = ""
+
+    fun setUrlBad(urlParam: String) {
+        url = urlParam // bad - unguarded
+        this.url = urlParam // bad - unguarded with this
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Synchronized, @Volatile, @GuardedBy, @Autowired protect fields</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+import org.springframework.beans.factory.annotation.Autowired
+import net.jcip.annotations.GuardedBy
+
+@Component
+class ProtectedFields {
+    @Volatile
+    var volatileField: String = ""
+
+    @GuardedBy("lock")
+    var guardedField: String = ""
+
+    var injectedField: String = ""
+
+    @Synchronized
+    fun setVolatileGood(v: String) {
+        volatileField = v // good: @Synchronized function
+    }
+
+    @Autowired
+    fun setInjected(dep: String) {
+        injectedField = dep // good: @Autowired function
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: request/prototype scope not shared</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+import org.springframework.context.annotation.Scope
+
+@Component
+@Scope("request")
+class RequestScopedComponent {
+    var url: String = ""
+    fun setUrl(u: String) {
+        url = u // good - request scope
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @NotThreadSafe excludes class</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Service
+import net.jcip.annotations.NotThreadSafe
+
+@Service
+@NotThreadSafe
+class NotThreadSafeService {
+    var url: String = ""
+    fun setUrl(u: String) {
+        url = u // good - @NotThreadSafe
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: val fields are immutable, local var, param reassignment</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Service
+
+@Service
+class ImmutableFieldsService {
+    val immutableField: String = "constant"
+
+    fun doWork(param: String) {
+        var local = "x"
+        local = "y" // good - local var
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: plain class not annotated as shared</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class PlainClass {
+    var url: String = ""
+    fun setUrl(u: String) {
+        url = u // good - not a shared object
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: @Component with session scope is shared</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>9</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+import org.springframework.context.annotation.Scope
+
+@Component
+@Scope("session")
+class SessionScopedComponent {
+    var url: String = ""
+    fun setUrlBad(u: String) {
+        url = u // bad - session scope is shared
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: companion object properties, afterPropertiesSet, @PostConstruct</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+import javax.annotation.PostConstruct
+
+@Component
+class WithCompanionAndInit {
+    var initField: String = ""
+    var postField: String = ""
+
+    fun afterPropertiesSet() {
+        initField = "initialized" // good - afterPropertiesSet
+    }
+
+    @PostConstruct
+    fun init() {
+        postField = "post" // good - @PostConstruct
+    }
+
+    companion object {
+        var staticField: String = "" // companion object - not flagged
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: @RestController is a shared object</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.web.bind.annotation.RestController
+
+@RestController
+class ARestController {
+    var url: String = ""
+    fun setUrlBad(urlParam: String) {
+        this.url = urlParam // bad
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: @Component multiple unguarded assignments</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>11, 14</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+
+@Component
+class Foo {
+    var url: String = ""
+    var boringField: String = ""
+    @Volatile var volatileGood: String = ""
+    var wiredGood: String = ""
+
+    fun setUrlBad(urlParam: String) {
+        boringField = urlParam // bad - unguarded
+        val urlx = urlParam + "x"
+        urlParam.length // good, not assignment
+        this.url = urlParam // bad - unguarded
+    }
+
+    fun setVolatileGood(vol: String) {
+        volatileGood = vol // good - @Volatile field
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @ConfigurationProperties excluded</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+import org.springframework.boot.context.properties.ConfigurationProperties
+
+@Component
+@ConfigurationProperties(prefix = "app")
+class AppConfig {
+    var field: String = ""
+    fun setField(f: String) {
+        field = f // good - @ConfigurationProperties
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: local var assignment with same name as field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Service
+
+@Service
+class LocalVarShadowing {
+    var url: String = ""
+
+    fun doWork() {
+        var url = "local"
+        url = "reassigned" // good - local var shadows field
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: param shadows field name</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Service
+
+@Service
+class ParamShadowing {
+    var url: String = ""
+
+    fun doWork(url: String) {
+        val x = url // good, reading param
+    }
+}
+]]></code>
+    </test-code>
+
+</test-data>
