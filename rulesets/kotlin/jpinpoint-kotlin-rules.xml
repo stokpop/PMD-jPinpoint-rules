@@ -801,6 +801,39 @@ class Foo {
         ]]></example>
     </rule>
 
+    <rule name="AvoidCompletionServiceTake"
+          language="kotlin"
+          message="Avoid completionService.take, use poll"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md">
+        <description>
+            Problem: take() stalls indefinitely in case of hanging threads and consumes a thread.&#13;
+            Solution: use poll() with a timeout value and handle the timeout.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.concurrent.CompletionService#take()')
+    and ./PostfixUnarySuffix/NavigationSuffix[@Identifier='take']
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun collectBad(completionService: CompletionService<List<Any>>): Future<List<Any>> {
+    return completionService.take() // bad
+}
+
+fun collectGood(completionService: CompletionService<List<Any>>): Future<List<Any>>? {
+    return completionService.poll(3L, TimeUnit.SECONDS) // good
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidFutureGetWithoutTimeout"
           language="kotlin"
           message="Avoid future.get without timeout"

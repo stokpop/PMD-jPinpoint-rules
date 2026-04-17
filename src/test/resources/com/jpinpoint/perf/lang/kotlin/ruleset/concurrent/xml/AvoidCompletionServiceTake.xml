@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: Avoid CompletionService Take</description>
+        <expected-problems>3</expected-problems>
+        <expected-linenumbers>7, 14, 15</expected-linenumbers>
+        <code><![CDATA[
+import java.util.concurrent.*
+
+class AvoidCompletionServiceTakeTest<T> {
+    private val complServField: CompletionService<List<T>>? = null
+
+    fun collectAllBad(completionService: CompletionService<List<T>>, responseCollector: MutableList<Any>) {
+        val futureLocal = completionService.take()  // bad
+        val runFut = CompletableFuture.supplyAsync { emptyList<Any>() }
+        responseCollector.addAll(runFut.get(3L, TimeUnit.SECONDS)) // good
+        take() // good, different take() method
+    }
+
+    fun collectAllBad2(execComplSrv: ExecutorCompletionService<Any>) {
+        val future = complServField!!.take() // bad
+        val take2 = execComplSrv.take() // bad
+    }
+
+    fun take(): Any? = null
+}
+]]></code>
+    </test-code>
+
+</test-data>
