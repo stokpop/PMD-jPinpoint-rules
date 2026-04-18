@@ -1411,7 +1411,28 @@ public class CacheKeyGenerator // bad, unclear name
   }
 }
 ```
+#### IC18
 
+**Observation: Simple caching providers like `SimpleCacheManager` or `ConcurrentMapCache` are used in production.** **Problem:** These simple implementations are intended for testing and prototyping. They lack critical production features such as eviction policies (e.g., LRU), maximum size limits, and manageability. This can lead to memory leaks and `OutOfMemoryError` as the cache grows indefinitely.  
+**Solution:** Use a robust, production-ready caching provider like **Caffeine**, **Ehcache**, or a distributed solution like **Redis**.  
+**Example:**
+```java
+// Bad: Simple caching with no limits
+@Bean 
+public CacheManager cacheManager() {
+    return new SimpleCacheManager().setCaches(Arrays.asList(new ConcurrentMapCache("myCache")));
+}
+
+// Good: Using Caffeine with size and time limits
+@Bean
+public CacheManager cacheManager() {
+    CaffeineCacheManager cacheManager = new CaffeineCacheManager("myCache");
+    cacheManager.setCaffeine(Caffeine.newBuilder()
+        .maximumSize(1000)
+        .expireAfterWrite(10, TimeUnit.MINUTES));
+    return cacheManager;
+}
+```
 Too much session usage
 ----------------------
 
@@ -1704,7 +1725,7 @@ Loading the classes every time means excessive class loading, it results in poor
 **Note:** The implementation class of the factory actually used might be just the default class specified in the factory interface code. The service loading mechanism will use this class when no other implementor is found in your classpath.
 Find out from a heap dump or classloading logging (-verbose:class) which one is actually used in your app.   
 Here it shows in a heap dump in VisualVM as only class with objects retaining bytes:
-![transformerFactory in heap](transformerFactoryInHeap.png)
+![transformerFactory in heap](images/transformerFactoryInHeap.png)
 
 **Note:** More on `TransformerFactory` and caching compiled templates, see IBM's [XSLT transformations cause high CPU and slow performance](http://www-01.ibm.com/support/docview.wss?uid=swg21641274).
 
