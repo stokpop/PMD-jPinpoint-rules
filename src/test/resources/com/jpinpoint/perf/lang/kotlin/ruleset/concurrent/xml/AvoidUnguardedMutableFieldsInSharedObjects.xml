@@ -7,8 +7,11 @@
     <test-code>
         <description>violation: var field in @Service without guards</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>3</expected-linenumbers>
+        <expected-linenumbers>6</expected-linenumbers>
         <code><![CDATA[
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.stereotype.Service
+
 @Service
 class AService {
     @Value("\${batchService.http.url}")
@@ -25,6 +28,9 @@ class AService {
         <description>no violation: @Value var with no unguarded assignment elsewhere</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.stereotype.Service
+
 @Service
 class GoodService {
     @Value("\${batchService.http.url}")
@@ -47,6 +53,9 @@ class NotShared {
         <description>no violation: @NotThreadSafe</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import net.jcip.annotations.NotThreadSafe
+import org.springframework.stereotype.Service
+
 @Service
 @NotThreadSafe
 class NotThreadSafeService {
@@ -59,6 +68,9 @@ class NotThreadSafeService {
         <description>no violation: @GuardedBy field</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+import org.springframework.stereotype.Component
+
 @Component
 class GuardedService {
     @GuardedBy("this")
@@ -71,6 +83,9 @@ class GuardedService {
         <description>no violation: @Volatile field</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Volatile
+import org.springframework.stereotype.Service
+
 @Service
 class VolatileService {
     @Volatile var url: String = "" // good, volatile
@@ -82,6 +97,9 @@ class VolatileService {
         <description>no violation: @Autowired field</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.stereotype.Component
+
 @Component
 class AutowiredService {
     @Autowired
@@ -93,8 +111,10 @@ class AutowiredService {
     <test-code>
         <description>violation: mutable type Date in @Service</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>3</expected-linenumbers>
+        <expected-linenumbers>5</expected-linenumbers>
         <code><![CDATA[
+import org.springframework.stereotype.Service
+
 @Service
 class BadMutableDate {
     val date: java.util.Date = java.util.Date() // bad, Date is mutable even with val
@@ -105,8 +125,10 @@ class BadMutableDate {
     <test-code>
         <description>violation: mutable HashMap in @Component</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>3</expected-linenumbers>
+        <expected-linenumbers>5</expected-linenumbers>
         <code><![CDATA[
+import org.springframework.stereotype.Component
+
 @Component
 class BadMutableMap {
     val map: java.util.HashMap<String, String> = java.util.HashMap() // bad, mutable
@@ -118,6 +140,9 @@ class BadMutableMap {
         <description>no violation: @GuardedBy on mutable type</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+import org.springframework.stereotype.Component
+
 @Component
 class GoodGuardedMap {
     @GuardedBy("this")
@@ -130,6 +155,9 @@ class GoodGuardedMap {
         <description>no violation: @Scope("request")</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Service
+
 @Service
 @Scope("request")
 class RequestScoped {
@@ -142,6 +170,9 @@ class RequestScoped {
         <description>no violation: @ConfigurationProperties</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.stereotype.Component
+
 @ConfigurationProperties(prefix = "app")
 @Component
 class AppConfig {
@@ -154,6 +185,9 @@ class AppConfig {
         <description>no violation: var only assigned in @PostConstruct</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import javax.annotation.PostConstruct
+import org.springframework.stereotype.Service
+
 @Service
 class PostConstructService {
     var url: String = ""

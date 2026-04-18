@@ -7,8 +7,10 @@
     <test-code>
         <description>violation: unguarded assignment in class with @Synchronized method</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>5</expected-linenumbers>
+        <expected-linenumbers>7</expected-linenumbers>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 class Bad {
     var date: String = ""
 
@@ -63,6 +65,9 @@ class Good {
         <description>no violation: @NotThreadSafe</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+import net.jcip.annotations.NotThreadSafe
+
 @NotThreadSafe
 class Good2 {
     var date: String = ""
@@ -79,6 +84,9 @@ class Good2 {
         <description>no violation: field is @GuardedBy</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+import net.jcip.annotations.GuardedBy
+
 class GoodGuarded {
     @GuardedBy("this")
     var date: String = ""
@@ -97,6 +105,9 @@ class GoodGuarded {
         <description>no violation: field is @Volatile</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+import kotlin.jvm.Volatile
+
 class GoodVolatile {
     @Volatile var date: String = ""
 
@@ -114,6 +125,10 @@ class GoodVolatile {
         <description>no violation: assignment inside @Inject method</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import javax.inject.Inject
+import kotlin.jvm.Synchronized
+import net.jcip.annotations.GuardedBy
+
 class GoodInject {
     @GuardedBy("this")
     var date: String = ""
@@ -134,6 +149,8 @@ class GoodInject {
         <description>no violation: local var shadows field name</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 class Good3 {
     var detailsResponse: String = ""
 

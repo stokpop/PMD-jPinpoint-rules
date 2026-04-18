@@ -32,6 +32,8 @@ class AService {
 import org.springframework.stereotype.Component
 import org.springframework.beans.factory.annotation.Autowired
 import net.jcip.annotations.GuardedBy
+import kotlin.jvm.Synchronized
+import kotlin.jvm.Volatile
 
 @Component
 class ProtectedFields {
@@ -190,9 +192,10 @@ class ARestController {
     <test-code>
         <description>violation: @Component multiple unguarded assignments</description>
         <expected-problems>2</expected-problems>
-        <expected-linenumbers>11, 14</expected-linenumbers>
+        <expected-linenumbers>12, 15</expected-linenumbers>
         <code><![CDATA[
 import org.springframework.stereotype.Component
+import kotlin.jvm.Volatile
 
 @Component
 class Foo {
@@ -271,8 +274,12 @@ class ParamShadowing {
     <test-code>
         <description>violation: unguarded assignment to companion object var field</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>8</expected-linenumbers>
+        <expected-linenumbers>12</expected-linenumbers>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+import kotlin.jvm.Volatile
+import org.springframework.stereotype.Service
+
 @Service
 class MyService {
     companion object {

@@ -7,8 +7,11 @@
     <test-code>
         <description>violation: non-private fields in @Controller shared object</description>
         <expected-problems>3</expected-problems>
-        <expected-linenumbers>4,5,6</expected-linenumbers>
+        <expected-linenumbers>7,8,9</expected-linenumbers>
         <code><![CDATA[
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.stereotype.Controller
+
 @Controller
 class RootController {
 
@@ -39,6 +42,9 @@ class RootController {
         <description>no violation: shared object but @NotThreadSafe</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import net.jcip.annotations.NotThreadSafe
+import org.springframework.stereotype.Controller
+
 @Controller
 @NotThreadSafe
 class RootController {
@@ -51,6 +57,8 @@ class RootController {
         <description>no violation: fields in nested classes inside shared object</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import org.springframework.stereotype.Controller
+
 @Controller
 class RootController {
     class Sub {
@@ -67,6 +75,11 @@ class RootController {
         <description>no violation: injected fields with @Autowired/@Value/@Inject</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import javax.inject.Inject
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.stereotype.Component
+
 @Component
 abstract class Issue268 {
 
@@ -86,6 +99,9 @@ abstract class Issue268 {
         <description>no violation: @Scope("request") excludes shared-object check</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Service
+
 @Service
 @Scope("request")
 class RequestScopedService {
@@ -97,8 +113,10 @@ class RequestScopedService {
     <test-code>
         <description>violation: @Service with non-private var fields</description>
         <expected-problems>2</expected-problems>
-        <expected-linenumbers>4,5</expected-linenumbers>
+        <expected-linenumbers>6,7</expected-linenumbers>
         <code><![CDATA[
+import org.springframework.stereotype.Service
+
 @Service
 class MyService {
 
@@ -112,8 +130,10 @@ class MyService {
     <test-code>
         <description>violation: companion object non-private var field</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>5</expected-linenumbers>
+        <expected-linenumbers>7</expected-linenumbers>
         <code><![CDATA[
+import org.springframework.stereotype.Repository
+
 @Repository
 class MyRepo {
     companion object {
@@ -128,8 +148,10 @@ class MyRepo {
     <test-code>
         <description>violation: @RestController non-private fields</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>4</expected-linenumbers>
+        <expected-linenumbers>6</expected-linenumbers>
         <code><![CDATA[
+import org.springframework.web.bind.annotation.RestController
+
 @RestController
 class MyRestController {
 
@@ -143,6 +165,9 @@ class MyRestController {
         <description>no violation: @Scope("prototype") excludes shared-object check</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Component
+
 @Component
 @Scope("prototype")
 class PrototypeBean {

@@ -94,6 +94,8 @@ class Good : SomeParent() {
         <description>no violation: mutator inside @Synchronized function</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 @org.springframework.stereotype.Component
 class Good : SomeParent() {
     @Synchronized

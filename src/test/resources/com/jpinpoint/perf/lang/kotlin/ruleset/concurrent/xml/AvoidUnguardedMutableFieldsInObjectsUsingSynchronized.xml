@@ -7,8 +7,10 @@
     <test-code>
         <description>violation: var field in class with @Synchronized method</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>2</expected-linenumbers>
+        <expected-linenumbers>4</expected-linenumbers>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 class Bad {
     var date: String = ""
 
@@ -42,8 +44,10 @@ class Bad {
     <test-code>
         <description>violation: HashMap mutable collection in class with @Synchronized</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>2</expected-linenumbers>
+        <expected-linenumbers>4</expected-linenumbers>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 class Bad {
     val map: java.util.HashMap<String, String> = java.util.HashMap()
 
@@ -56,8 +60,10 @@ class Bad {
     <test-code>
         <description>violation: var and mutable type both flagged</description>
         <expected-problems>2</expected-problems>
-        <expected-linenumbers>2,3</expected-linenumbers>
+        <expected-linenumbers>4,5</expected-linenumbers>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 class Bad {
     var name: String = ""
     val date: java.util.Date = java.util.Date()
@@ -71,8 +77,10 @@ class Bad {
     <test-code>
         <description>violation: companion object var field</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>3</expected-linenumbers>
+        <expected-linenumbers>5</expected-linenumbers>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 class Bad {
     companion object {
         var counter: Int = 0
@@ -88,6 +96,8 @@ class Bad {
         <description>no violation: @NotThreadSafe class</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 @net.jcip.annotations.NotThreadSafe
 class Good {
     var date: String = ""
@@ -102,6 +112,8 @@ class Good {
         <description>no violation: @GuardedBy on var field</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 class Good {
     @net.jcip.annotations.GuardedBy("this")
     var date: String = ""
@@ -116,6 +128,9 @@ class Good {
         <description>no violation: @Volatile var field</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+import kotlin.jvm.Volatile
+
 class Good {
     @Volatile
     var date: String = ""
@@ -130,6 +145,8 @@ class Good {
         <description>no violation: @Autowired var field</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 class Good {
     @org.springframework.beans.factory.annotation.Autowired
     var service: String = ""
@@ -156,6 +173,8 @@ class Good {
         <description>no violation: @Value field with no unguarded assignment</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 class Good {
     @org.springframework.beans.factory.annotation.Value("\${url}")
     var url: String = ""
@@ -170,6 +189,8 @@ class Good {
         <description>no violation: @Inject field</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
+import kotlin.jvm.Synchronized
+
 class Good {
     @javax.inject.Inject
     var service: String = ""
