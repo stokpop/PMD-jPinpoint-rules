@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests https://pmd.sourceforge.io/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>violation: @GuardedBy argument is not a string literal</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad1 {
+    companion object { const val FIELD = "field" }
+    @GuardedBy(FIELD) // bad - not a string literal
+    var data: String = ""
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: @GuardedBy value refers to non-existent field</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad2 {
+    @GuardedBy("nonExistent") // bad - no such field
+    var data: String = ""
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: @GuardedBy("this") but no synchronized or @Synchronized usage</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad3 {
+    @GuardedBy("this") // bad - no sync mechanism
+    var data: String = ""
+
+    fun setData(d: String) { data = d }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: lock field is var (not val)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad4 {
+    var lock = Any() // bad - lock should be private val
+    @GuardedBy("lock")
+    var data: String = ""
+
+    fun setData(d: String) {
+        synchronized(lock) { data = d }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: lock field is not private</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad5 {
+    val lock = Any() // bad - not private
+    @GuardedBy("lock")
+    var data: String = ""
+
+    fun setData(d: String) {
+        synchronized(lock) { data = d }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: proper @GuardedBy("lock") with private val lock</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Good1 {
+    private val lock = Any()
+    @GuardedBy("lock")
+    var data: String = ""
+
+    fun setData(d: String) {
+        synchronized(lock) { data = d }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @GuardedBy("this") with @Synchronized method</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Good2 {
+    @GuardedBy("this")
+    var data: String = ""
+
+    @Synchronized
+    fun setData(d: String) { data = d }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @GuardedBy("this") with synchronized(this) block</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Good3 {
+    @GuardedBy("this")
+    var data: String = ""
+
+    fun setData(d: String) {
+        synchronized(this) { data = d }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: companion object with private val lock</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Good5 {
+    companion object {
+        private val lock = Any()
+        @GuardedBy("lock")
+        var shared: String = ""
+    }
+
+    fun setShared(d: String) {
+        synchronized(lock) { shared = d }
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

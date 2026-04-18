@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests https://pmd.sourceforge.io/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>violation: write to @GuardedBy("this") field without synchronization</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad1 {
+    @GuardedBy("this")
+    var txt: String = ""
+
+    fun setText(t: String) { txt = t } // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: read of @GuardedBy("this") field without synchronization</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad2 {
+    @GuardedBy("this")
+    var txt: String = ""
+
+    fun getText(): String { return txt } // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: read and write to @GuardedBy("this") field without synchronization</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>7,8</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad3 {
+    @GuardedBy("this")
+    var txt: String = ""
+
+    fun getText(): String { return txt } // bad
+    fun setText(t: String) { txt = t }   // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: access in non-synchronized method with synchronized elsewhere</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>10</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad4 {
+    @GuardedBy("this")
+    var txt: String = ""
+
+    @Synchronized
+    fun setText(t: String) { txt = t } // good
+
+    fun getText(): String { return txt } // bad - not synchronized
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: companion object field @GuardedBy("this") without synchronization</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>9</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad5 {
+    companion object {
+        @GuardedBy("this")
+        var shared: String = ""
+    }
+
+    fun setShared(t: String) { shared = t } // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @GuardedBy("this") with @Synchronized method</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Good1 {
+    @GuardedBy("this")
+    var txt: String = ""
+
+    @Synchronized
+    fun getText(): String { return txt } // good
+    @Synchronized
+    fun setText(t: String) { txt = t }   // good
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @GuardedBy("this") with synchronized(this) block</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Good2 {
+    @GuardedBy("this")
+    var txt: String = ""
+
+    fun getText(): String {
+        return synchronized(this) { txt } // good
+    }
+    fun setText(t: String) {
+        synchronized(this) { txt = t }    // good
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @GuardedBy("this") with synchronized(this@ClassName) block</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Good3 {
+    @GuardedBy("this")
+    var txt: String = ""
+
+    fun getText(): String {
+        return synchronized(this@Good3) { txt } // good - this@label
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Autowired method</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+import org.springframework.beans.factory.annotation.Autowired
+
+class Good4 {
+    @GuardedBy("this")
+    var txt: String = ""
+
+    @Autowired
+    fun init(t: String) { txt = t } // good - framework injection
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: field without @GuardedBy("this")</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Good5 {
+    var txt: String = ""
+
+    fun setText(t: String) { txt = t } // good - no @GuardedBy
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @GuardedBy("lock") - different guard</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Good6 {
+    private val lock = Any()
+
+    @GuardedBy("lock")
+    var txt: String = ""
+
+    fun setText(t: String) { txt = t } // not this rule's concern
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
