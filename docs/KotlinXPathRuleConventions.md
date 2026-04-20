@@ -83,6 +83,9 @@ A custom attribute `@IsClassField` (boolean, true when not inside `FunctionBody`
 **Implementation:** Add `getIsClassField()` method with `@Attribute` to
 `ASTPropertyDeclaration` in pmd-kotlin, returning `getAncestors(ASTFunctionBody.class).isEmpty()`.
 
+When type information is available, prefer `pmd-kotlin:typeIs(...)` on the declaration
+or initializer expression before adding broader syntax-only fallbacks.
+
 ---
 
 ## 4. Future improvement: `pmd-kotlin:isConstantArg(node)` XPath function
@@ -106,6 +109,8 @@ interpolations, or `var` fields would replace all of this.
 
 **Note:** Implemented as an XPath function (not attribute) because it needs to traverse
 ancestor context (function parameter list) — it is not purely local to the argument node.
+For new Kotlin rules, only reach for a function when the check genuinely needs that
+cross-node semantic context; ordinary type checks should stay explicit with `typeIs(...)`.
 
 ---
 

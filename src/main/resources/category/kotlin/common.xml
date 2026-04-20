@@ -56,11 +56,11 @@ class AvoidInMemoryStreamingDefaultConstructor {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: requires kotlin-type-mapper auxClasspath for inferred-type (constructor) coverage :)
-//PropertyDeclaration[pmd-kotlin:typeIs('java.lang.StringBuffer')]
-|
-(: fallback: explicit type declaration e.g. var fieldSb: StringBuffer? = null :)
-//PropertyDeclaration[.//TypeReference//T-Identifier[@Text='StringBuffer']]
+(: requires type info on the declaration or initializer expression :)
+//PropertyDeclaration[
+    pmd-kotlin:typeIs('java.lang.StringBuffer')
+    or Expression//PrimaryExpression[pmd-kotlin:typeIs('java.lang.StringBuffer')]
+]
 ]]>
                 </value>
             </property>
@@ -93,13 +93,15 @@ class AvoidStringBuffer {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: requires kotlin-type-mapper auxClasspath for inferred-type (constructor) coverage :)
+(: requires type info on the declaration or initializer expression :)
 (: also match when declared type is a supertype (e.g. val x: NumberFormat = DecimalFormat(...)) :)
 //PropertyDeclaration[
     not(ancestor::FunctionBody)
     and (
         pmd-kotlin:typeIs('java.text.DecimalFormat') or pmd-kotlin:typeIs('java.text.ChoiceFormat')
-        or Expression//PrimaryExpression[@Identifier='DecimalFormat' or @Identifier='ChoiceFormat']
+        or Expression//PrimaryExpression[
+            pmd-kotlin:typeIs('java.text.DecimalFormat') or pmd-kotlin:typeIs('java.text.ChoiceFormat')
+        ]
     )
 ]
 ]]>
