@@ -45,5 +45,20 @@ class Bar {
         }
 }
      ]]></code>
+    </test-code>    <test-code>
+        <description>violation: wide scope XPath in top-level function (not in a class)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.w3c.dom.Node
+import javax.xml.xpath.XPathFactory
+
+fun parseSomethingTopLevel(xpath: javax.xml.xpath.XPath, books: Node) {
+    val expr = xpath
+        .compile("//book[author='Isaac Asimov']/title/text()") // bad - top-level function
+    val result = expr.evaluate(books)
+}
+]]></code>
     </test-code>
+
 </test-data>
