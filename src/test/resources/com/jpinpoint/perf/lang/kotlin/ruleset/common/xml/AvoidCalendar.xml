@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: Calendar.getInstance() in method</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.Calendar
+
+class Foo {
+    fun bad(): Calendar {
+        return Calendar.getInstance() // bad
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: GregorianCalendar constructor in method</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.GregorianCalendar
+
+class Foo {
+    fun bad(): GregorianCalendar {
+        return GregorianCalendar() // bad
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: java.time LocalDateTime.now()</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.time.LocalDateTime
+
+class Foo {
+    fun good(): LocalDateTime = LocalDateTime.now()
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: Calendar.getInstance() in top-level function</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+import java.util.Calendar
+
+fun bad(): Calendar = Calendar.getInstance() // bad - top-level function
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: Calendar.getInstance() in lambda</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.Calendar
+
+class Foo {
+    val badLambda: () -> Calendar = {
+        Calendar.getInstance() // bad
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: Calendar in companion object val - Calendar is always heavyweight</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.Calendar
+
+class Foo {
+    companion object {
+        val INSTANCE: Calendar = Calendar.getInstance() // bad - Calendar is inefficient regardless
+    }
+}
+        ]]></code>
+    </test-code>
+</test-data>

@@ -712,6 +712,39 @@ class Foo {
         </example>
     </rule>
 
+    <rule name="AvoidCalendar"
+          language="kotlin"
+          message="A Calendar is inefficient in memory usage."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#imu01">
+        <description>Problem: A Calendar is a heavyweight object and expensive to create.
+            Solution: Use java.time.LocalDateTime or java.time.ZonedDateTime instead.
+            (jpinpoint-rules)
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,memory,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.Calendar#getInstance(*)')
+    or pmd-kotlin:matchesSig('java.util.Calendar#<init>(*)')
+    or pmd-kotlin:matchesSig('java.util.GregorianCalendar#<init>(*)')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.Calendar
+import java.time.LocalDateTime
+
+class Foo {
+    fun bad(): Calendar = Calendar.getInstance() // bad
+    fun good(): LocalDateTime = LocalDateTime.now() // good
+}
+        ]]></example>
+    </rule>
+
     <rule name="LegacyTimeLibraryUsed"
           language="kotlin"
           message="Migrate from the legacy time library to java.time for better performance."
