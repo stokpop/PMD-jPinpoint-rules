@@ -2,6 +2,43 @@
 <ruleset name="jpinpoint-remoting-rules" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0">
     <description>jPinpoint rule set for performance aware Kotlin coding, sponsored by Rabobank.</description>
 
+    <rule name="GsonCreatedForEachMethodCall"
+          language="kotlin"
+          message="A Gson object is created for each method call, which is expensive."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#IUOJAR03">
+        <description>Problem: Gson creation is relatively expensive.
+            Solution: Since Gson objects are thread-safe after creation, they can be shared between threads.
+            Reuse created instances from a companion object or top-level val.
+            (jpinpoint-rules)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('com.google.gson.Gson#<init>(*)')
+    or pmd-kotlin:matchesSig('com.google.gson.GsonBuilder#create()'))
+    and (pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import com.google.gson.Gson
+
+class Foo {
+    companion object {
+        private val GSON = Gson() // good
+    }
+    fun toJson(obj: Any): String {
+        return Gson().toJson(obj) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
     <rule name="HttpClientBuilderWithoutDisableConnectionState"
           language="kotlin"
           message="A HttpClient builder is used and disableConnectionState is not called. HTTP client tracks connection state while using TLS."

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: Gson() constructor in method</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import com.google.gson.Gson
+
+class Foo {
+    fun toJson(obj: Any): String {
+        return Gson().toJson(obj) // bad
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: GsonBuilder().create() in method</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import com.google.gson.GsonBuilder
+
+class Foo {
+    fun toJson(obj: Any): String {
+        val gson = GsonBuilder()
+            .create() // bad
+        return gson.toJson(obj)
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: Gson in companion object val - created once</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import com.google.gson.Gson
+
+class Foo {
+    companion object {
+        private val GSON = Gson() // good - companion object val, created once
+    }
+    fun toJson(obj: Any): String = GSON.toJson(obj)
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: Gson as top-level val - created once</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import com.google.gson.Gson
+
+private val GSON = Gson() // good - top-level val, created once
+
+fun toJson(obj: Any): String = GSON.toJson(obj)
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: Gson() constructor in lambda</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import com.google.gson.Gson
+
+class Foo {
+    fun process(items: List<Any>): List<String> =
+        items.map {
+            Gson().toJson(it) // bad - Gson created per lambda invocation
+        }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: Gson() in top-level function</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+import com.google.gson.Gson
+
+fun toJson(obj: Any): String = Gson().toJson(obj) // bad - top-level function
+        ]]></code>
+    </test-code>
+</test-data>
