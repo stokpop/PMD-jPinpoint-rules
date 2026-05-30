@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: ObjectMapper() constructor in method</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class Foo {
+    fun toJson(obj: Any): String {
+        return ObjectMapper().writeValueAsString(obj) // bad
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: JsonMapper.builder().build() in method</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.json.JsonMapper
+
+class Foo {
+    fun toJson(obj: Any): String {
+        val mapper = JsonMapper.builder().build() // bad
+        return mapper.writeValueAsString(obj)
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: ObjectMapper in companion object val - created once</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class Foo {
+    companion object {
+        private val MAPPER = ObjectMapper() // good - created once
+    }
+    fun toJson(obj: Any): String = MAPPER.writeValueAsString(obj)
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: ObjectMapper as top-level val - created once</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+private val MAPPER = ObjectMapper() // good - top-level val, created once
+
+fun toJson(obj: Any): String = MAPPER.writeValueAsString(obj)
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: ObjectMapper() in lambda</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class Foo {
+    fun toJsonList(items: List<Any>): List<String> =
+        items.map {
+            ObjectMapper().writeValueAsString(it) // bad - created per lambda invocation
+        }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: ObjectMapper() in top-level function</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+fun toJson(obj: Any): String = ObjectMapper().writeValueAsString(obj) // bad - top-level function
+        ]]></code>
+    </test-code>
+</test-data>

@@ -2,6 +2,45 @@
 <ruleset name="jpinpoint-remoting-rules" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0">
     <description>jPinpoint rule set for performance aware Kotlin coding, sponsored by Rabobank.</description>
 
+    <rule name="ObjectMapperCreatedForEachMethodCall"
+          language="kotlin"
+          message="An ObjectMapper or JsonMapper is created for each method call, which is expensive."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#IUOJAR01">
+        <description>Problem: Jackson ObjectMapper/JsonMapper creation is expensive because it does much class loading.
+            Solution: Since ObjectMapper/JsonMapper objects are thread-safe after configuration in one thread,
+            they can be shared afterward between requests and reused. Reuse created instances from a companion object
+            or top-level val.
+            (jpinpoint-rules)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('com.fasterxml.jackson.databind.ObjectMapper#<init>(*)')
+    or pmd-kotlin:matchesSig('com.fasterxml.jackson.databind.json.JsonMapper#builder(*)')
+    or pmd-kotlin:matchesSig('com.fasterxml.jackson.databind.cfg.MapperBuilder#build()'))
+    and (pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class Foo {
+    companion object {
+        private val MAPPER = ObjectMapper() // good
+    }
+    fun toJson(obj: Any): String {
+        return ObjectMapper().writeValueAsString(obj) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
     <rule name="GsonCreatedForEachMethodCall"
           language="kotlin"
           message="A Gson object is created for each method call, which is expensive."
