@@ -148,7 +148,9 @@ class Foo {
                 <value><![CDATA[
 (: requires kotlin-type-mapper auxClasspath; matchesSig replaces import filter :)
 (: deduplication: only match innermost PUE — avoids column-range false positives on outer chain PUEs :)
-//FunctionBody//PostfixUnaryExpression[pmd-kotlin:matchesSig('java.util.regex.Pattern#compile(*)')
+//PostfixUnaryExpression[
+    (pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and pmd-kotlin:matchesSig('java.util.regex.Pattern#compile(*)')
     and not(.//PostfixUnaryExpression[pmd-kotlin:matchesSig('java.util.regex.Pattern#compile(*)')])
 (: check for variables $action or ${action} in String of compile() call (first in possible call chain): allow dynamic input :)
     and not(

@@ -133,4 +133,40 @@ class Rule(val name: String, val regex: String) {
 ]]></code>
     </test-code>
 
+    <test-code>
+        <description>violation: Avoid recompiling patterns inside standalone lambda (not inside function body)</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>4, 9</expected-linenumbers>
+        <code><![CDATA[
+import java.util.regex.Pattern
+
+val validator: (String) -> Boolean = { input ->
+    Pattern.compile("\\d+").matcher(input).matches() // bad - compiled on every lambda call
+}
+
+class Foo {
+    val filter: (String) -> Boolean = { s ->
+        val p = Pattern.compile("[A-Z]+") // bad - compiled on every lambda call
+        p.matcher(s).matches()
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: Avoid recompiling patterns - val outside lambda is ok</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.regex.Pattern
+
+val PATTERN = Pattern.compile("\\d+") // good - top-level val, compiled once
+
+class Good {
+    companion object {
+        val DIGIT_PAT = Pattern.compile("[0-9]+") // good - companion val, compiled once
+    }
+}
+]]></code>
+    </test-code>
+
 </test-data>
