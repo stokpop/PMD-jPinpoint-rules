@@ -545,12 +545,11 @@ class AvoidStringBuffer {
             <property name="xpath">
                 <value><![CDATA[
 (: matchesSig for javax.xml.xpath.XPath#compile; report at the T-Identifier token (line of .compile) not the full expression start :)
-//ClassMemberDeclaration
-    //PostfixUnaryExpression[
-        pmd-kotlin:matchesSig('javax.xml.xpath.XPath#compile(_)')
-        and (.//ValueArgument)[1]//T-LineStrText[starts-with(@Text, '//')]
-    ]
-    /PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='compile']]]></value>
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('javax.xml.xpath.XPath#compile(_)')
+    and (.//ValueArgument)[1]//T-LineStrText[starts-with(@Text, '//')]
+]
+/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='compile']]]></value>
             </property>
         </properties>
         <example><![CDATA[
@@ -589,7 +588,7 @@ class Foo {
             <property name="xpath">
                 <value><![CDATA[
 (: XPathAPI is highly specific; @Identifier replaces import filter + SimpleIdentifier/T-Identifier traversal :)
-//ClassBody//PrimaryExpression[@Identifier='XPathAPI']
+//PrimaryExpression[@Identifier='XPathAPI']
 	]]></value>
             </property>
         </properties>
