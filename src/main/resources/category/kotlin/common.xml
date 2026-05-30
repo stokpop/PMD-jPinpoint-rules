@@ -568,7 +568,7 @@ class Good {
             <property name="xpath">
                 <value><![CDATA[
 (: XPathAPI is highly specific; @Identifier replaces import filter + SimpleIdentifier/T-Identifier traversal :)
-//ClassBody//PrimaryExpression[@Identifier='XPathAPI']
+//PrimaryExpression[@Identifier='XPathAPI']
 	]]></value>
             </property>
         </properties>

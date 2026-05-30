@@ -32,5 +32,33 @@ class FooGood {
     }
 }
      ]]></code>
+    </test-code>    <test-code>
+        <description>violation: XPathAPI in top-level function (not in a class)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.xpath.XPathAPI
+
+fun badTopLevel(doc: org.w3c.dom.Node?): String? {
+    return XPathAPI.eval(doc, "/Envelope/Header/Action").toString() // bad - top-level
+}
+]]></code>
     </test-code>
+
+    <test-code>
+        <description>violation: XPathAPI in object declaration</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.xpath.XPathAPI
+import org.w3c.dom.Node
+
+object XPathHelper {
+    fun getAction(doc: Node?): String? {
+        return XPathAPI.eval(doc, "/Envelope/Header/Action").toString() // bad - object
+    }
+}
+]]></code>
+    </test-code>
+
 </test-data>
