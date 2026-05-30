@@ -2,6 +2,46 @@
 <ruleset name="jpinpoint-remoting-rules" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0">
     <description>jPinpoint rule set for performance aware Kotlin coding, sponsored by Rabobank.</description>
 
+    <rule name="AvoidXMLGregorianCalendar"
+          language="kotlin"
+          message="XMLGregorianCalendar is used. It is slow in JAXB."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iuoxar05">
+        <description>Problem: XMLGregorianCalendar is a large object involving substantial processing. It is created
+            with the poorly performing DatatypeFactory.
+            Solution: Add a converter for alternative date handling with java.time.
+            (jpinpoint-rules)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: factory method call :)
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('javax.xml.datatype.DatatypeFactory#newXMLGregorianCalendar(*)')]
+|
+(: property/field with XMLGregorianCalendar declared type (name-based: distinctive class name) :)
+//PropertyDeclaration[
+    not(ancestor::FunctionBody)
+    and .//T-Identifier[@Text='XMLGregorianCalendar']
+]
+|
+(: function parameter typed as XMLGregorianCalendar :)
+//FunctionValueParameter[.//T-Identifier[@Text='XMLGregorianCalendar']]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import javax.xml.datatype.XMLGregorianCalendar
+import java.time.LocalDateTime
+
+class Foo {
+    private var cal: XMLGregorianCalendar? = null // bad
+    fun good(dt: LocalDateTime): String = dt.toString() // good
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidObjectMapperAsField"
           language="kotlin"
           message="Avoid ObjectMapper as field, use ObjectReader or ObjectWriter instead."
