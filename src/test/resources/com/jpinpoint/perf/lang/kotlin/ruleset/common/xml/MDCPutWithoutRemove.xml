@@ -108,5 +108,66 @@ class LocalMdcShadowingTest {
     }
 }
 ]]></code>
+    </test-code>    <test-code>
+        <description>violation: multi-line MDC.put should report at MDC line (PUE start), not put line</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.MDC
+
+class FooKtMultiLine {
+    fun bad() {
+        MDC
+            .put("key", "value") // violation: should report line 5 (MDC) not line 6 (.put)
+    }
+}
+]]></code>
     </test-code>
+    <test-code>
+        <description>violation: MDC.put in lambda without remove should be flagged</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.MDC
+
+class FooKtLambda {
+    fun bad() {
+        val runnable = Runnable {
+            MDC.put("key", "value") // violation: no remove in lambda
+        }
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: MDC.put in lambda with remove in same lambda</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.MDC
+
+class FooKtLambdaGood {
+    fun good() {
+        val runnable = Runnable {
+            MDC.put("key", "value")
+            MDC.remove("key")
+        }
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: MDC.put in top-level function without remove should be flagged</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.MDC
+
+fun badTopLevel() {
+    MDC.put("key", "value") // violation: top-level function, no remove
+}
+]]></code>
+    </test-code>
+
 </test-data>
