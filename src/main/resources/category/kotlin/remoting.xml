@@ -2,6 +2,46 @@
 <ruleset name="jpinpoint-remoting-rules" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0">
     <description>jPinpoint rule set for performance aware Kotlin coding, sponsored by Rabobank.</description>
 
+    <rule name="AvoidObjectMapperAsField"
+          language="kotlin"
+          message="Avoid ObjectMapper as field, use ObjectReader or ObjectWriter instead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iuojar02">
+        <description>Problem: Configuring an ObjectMapper is not thread-safe.
+            Solution: Create ObjectReaders and ObjectWriters from ObjectMapper and only share those as a property,
+            since they are immutable and therefore thread-safe.
+            Exception: convertValue is not provided by ObjectReader/ObjectWriter; suppress the rule in that case.
+            (jpinpoint-rules)
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: requires type info: kotlin-type-mapper auxClasspath :)
+//PropertyDeclaration[
+    not(ancestor::FunctionBody)
+    and (
+        pmd-kotlin:typeIs('com.fasterxml.jackson.databind.ObjectMapper')
+        or Expression//PrimaryExpression[
+            pmd-kotlin:typeIs('com.fasterxml.jackson.databind.ObjectMapper')
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.ObjectReader
+
+class Foo {
+    private val mapper: ObjectMapper = ObjectMapper() // bad
+    private val reader: ObjectReader = ObjectMapper().readerFor(Any::class.java) // good
+}
+        ]]></example>
+    </rule>
+
     <rule name="ObjectMapperCreatedForEachMethodCall"
           language="kotlin"
           message="An ObjectMapper or JsonMapper is created for each method call, which is expensive."
