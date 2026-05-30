@@ -617,7 +617,9 @@ class FooGood {
             <property name="xpath">
                 <value><![CDATA[
 (: Branch 1: Regex constructor — uses @Identifier on PrimaryExpression; matchesSig has column-range bug on multi-line PUEs :)
-//FunctionDeclaration//PostfixUnaryExpression[PrimaryExpression[@Identifier='Regex']
+//PostfixUnaryExpression[
+    (pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and PrimaryExpression[@Identifier='Regex']
     (: not called on fun parameter :)
     and not(.//CallSuffix//PrimaryExpression//T-Identifier[
         @Text = ancestor::FunctionDeclaration//FunctionValueParameter//Parameter/@Identifier])
@@ -631,17 +633,18 @@ class FooGood {
        @Text = ancestor::FunctionDeclaration//Parameter/SimpleIdentifier/T-Identifier/concat('$', @Text)])
     (: not param in String template of class var field :)
     and not(.//CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef[
-       @Text = ancestor::ClassDeclaration//PropertyDeclaration[T-VAR]//SimpleIdentifier/T-Identifier/concat('$', @Text)])
+       @Text = ancestor::ClassDeclaration//PropertyDeclaration[@Mutable = true()]//SimpleIdentifier/T-Identifier/concat('$', @Text)])
     (: not param in String concatenation of class var field :)
     and not(.//CallSuffix/ValueArguments/ValueArgument[//LineStringLiteral]//AdditiveExpression/MultiplicativeExpression//SimpleIdentifier/T-Identifier[
-       @Text = ancestor::ClassDeclaration//PropertyDeclaration[T-VAR]//VariableDeclaration/@Identifier])
+       @Text = ancestor::ClassDeclaration//PropertyDeclaration[@Mutable = true()]//VariableDeclaration/@Identifier])
 ]
 
 |
 
 (: Branch 2: .toRegex() — using @Identifier; matchesSig FQCN for kotlin.text.StringsKt#toRegex needs verification :)
-//FunctionDeclaration//PostfixUnaryExpression[
-    PostfixUnarySuffix/NavigationSuffix[@Identifier='toRegex']
+//PostfixUnaryExpression[
+    (pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and PostfixUnarySuffix/NavigationSuffix[@Identifier='toRegex']
     (: not called on function parameter :)
     and not(PrimaryExpression[@Identifier = ancestor::FunctionDeclaration//FunctionValueParameter//Parameter/@Identifier])
     (: not called on 'dynamic' function call :)
@@ -663,8 +666,9 @@ class FooGood {
 |
 
 (: Branch 4: FileSystem.getPathMatcher — navigate to T-Identifier leaf to report correct line for multi-line chains :)
-//FunctionDeclaration//PostfixUnaryExpression[
-    (PrimaryExpression[@Identifier='FileSystems']
+//PostfixUnaryExpression[
+    (pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and (PrimaryExpression[@Identifier='FileSystems']
      or PrimaryExpression[@Identifier =
           ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration[..//Expression//PrimaryExpression[@Identifier='FileSystems']]/@Identifier]
     )

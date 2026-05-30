@@ -520,4 +520,22 @@ class Foo() {
 }
 ]]></code>
     </test-code>
+
+    <test-code>
+        <description>violation: Avoid implicit recompiling of regular expressions inside lambdas</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>3, 7</expected-linenumbers>
+        <code><![CDATA[
+val badRegexConstructor: (String) -> Boolean = { s ->
+    s.contains("test") // good - no regex
+    Regex("\\d+").matches(s) // bad - Regex() constructor in lambda (branch 1)
+}
+class Foo {
+    val badToRegex: (String) -> Boolean = { s ->
+        s.matches("\\d+".toRegex()) // bad - toRegex() in lambda (branch 2)
+    }
+}
+]]></code>
+    </test-code>
+
 </test-data>
