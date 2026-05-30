@@ -106,4 +106,37 @@ class Good3 {
 ]]></code>
     </test-code>
 
+    <test-code>
+<description>violation: Avoid Future Join Without Timeout - top-level function (no class wrapper)</description>
+<expected-problems>1</expected-problems>
+<expected-linenumbers>6</expected-linenumbers>
+<code><![CDATA[
+import java.util.concurrent.*
+
+fun processOrders(futures: List<CompletableFuture<Any>>): List<Any> {
+    return futures
+.filter { it.isDone && !it.isCompletedExceptionally }
+.map { it.join() } // bad, no timeout - top-level function
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+<description>no violation: Avoid Future Join Without Timeout - top-level function with timeout</description>
+<expected-problems>0</expected-problems>
+<code><![CDATA[
+import java.util.concurrent.*
+
+fun processOrdersGood(futures: List<CompletableFuture<Any>>): List<Any> {
+    val allResult = CompletableFuture.allOf(*futures.toTypedArray())
+    try {
+allResult.get(5L, TimeUnit.SECONDS) // good
+    } catch (e: Exception) { }
+    return futures
+.filter { it.isDone && !it.isCompletedExceptionally }
+.map { it.join() } // good - timeout above
+}
+]]></code>
+    </test-code>
+
 </test-data>
