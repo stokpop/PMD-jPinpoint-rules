@@ -1009,7 +1009,7 @@ class RootController {
 //Assignment[
   (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
-      T-VAR
+      @Mutable = true()
       and not(ancestor::FunctionBody)
       (: not @Volatile :)
       and not(pmd-kotlin:hasAnnotation('Volatile'))
@@ -1121,7 +1121,7 @@ class Good {
     (
       (: Case A: direct assignment like "mutableField = value" or "this.mutableField = value" :)
       @Text = ancestor::ClassBody[1]//PropertyDeclaration[
-        T-VAR
+        @Mutable = true()
         and not(ancestor::FunctionBody)
         (: not @Volatile :)
         and not(pmd-kotlin:hasAnnotation('Volatile'))
@@ -1237,7 +1237,7 @@ class MyService {
   and not(ancestor::ClassDeclaration[ancestor::ClassBody])
   and (
     (: Case 1: var field that is not volatile and not guarded :)
-    T-VAR
+    @Mutable = true()
     and not(pmd-kotlin:modifiers()='volatile')
     and not(pmd-kotlin:hasAnnotation('Volatile'))
     (: not annotated with framework/GuardedBy :)
@@ -1375,7 +1375,7 @@ class Good {
   and not(ancestor::ClassDeclaration[ancestor::ClassBody])
   and (
     (: Case 1: var field that is not volatile and not guarded :)
-    T-VAR
+    @Mutable = true()
     and not(pmd-kotlin:modifiers()='volatile')
     and not(pmd-kotlin:hasAnnotation('Volatile'))
     (: not annotated with framework/GuardedBy :)
@@ -1895,7 +1895,7 @@ class Good {
     ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]
       //Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText/@Text
   (: but it is not private val :)
-  and (T-VAR or not(pmd-kotlin:modifiers() = 'private'))
+  and (@Mutable = true() or not(pmd-kotlin:modifiers() = 'private'))
 ]
                 ]]></value>
             </property>
