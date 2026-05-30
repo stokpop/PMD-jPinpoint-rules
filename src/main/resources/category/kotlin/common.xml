@@ -712,6 +712,45 @@ class Foo {
         </example>
     </rule>
 
+    <rule name="AvoidLoadingAllFromFile"
+          language="kotlin"
+          message="Files.readAll methods and similar APIs load all bytes into memory: a risk of memory problems."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isio03">
+        <description>Problem: APIs like Files.readAllBytes, Files.readAllLines, Files.readString,
+            InputStream.readAllBytes, IOUtils.toByteArray, ByteArrayOutputStream.toByteArray
+            load entire content into heap memory. This risks OutOfMemoryError, long GC pauses,
+            and slow responses when processing large files.
+            Solution: Use streaming APIs end-to-end, do not buffer whole files in memory.
+            Note: Not a problem for small files. Use @SuppressWarnings("PMD.AvoidLoadingAllFromFile") then.
+            (jpinpoint-rules)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,memory,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.nio.file.Files#readAllBytes(*)')
+    or pmd-kotlin:matchesSig('java.nio.file.Files#readAllLines(*)')
+    or pmd-kotlin:matchesSig('java.nio.file.Files#readString(*)')
+    or pmd-kotlin:matchesSig('java.io.InputStream#readAllBytes()')
+    or pmd-kotlin:matchesSig('java.io.ByteArrayOutputStream#toByteArray()')
+    or pmd-kotlin:matchesSig('org.springframework.util.ResizableByteArrayOutputStream#toByteArray()')
+    or pmd-kotlin:matchesSig('org.apache.commons.io.IOUtils#toByteArray(*)')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun bad(path: Path): ByteArray = Files.readAllBytes(path) // bad
+fun good(path: Path) = Files.newInputStream(path).use { it.copyTo(System.out) } // good
+        ]]></example>
+    </rule>
+
     <rule name="AvoidCalendar"
           language="kotlin"
           message="A Calendar is inefficient in memory usage."
