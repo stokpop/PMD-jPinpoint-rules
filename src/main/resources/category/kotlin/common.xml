@@ -374,24 +374,19 @@ object GoodAvoidRecompilingXPathExpressionKt {
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-(: branch 1: typeIs for PropertyDeclarations where type is declared/inferred as SimpleDateFormat :)
-//PropertyDeclaration[
-    pmd-kotlin:typeIs('java.text.SimpleDateFormat')
-    and not(ancestor::ClassMemberDeclaration[
-        .//NavigationSuffix[@Identifier='setDateFormat']
-        and //ImportHeader[.//T-Identifier[@Text='fasterxml'] and .//T-Identifier[@Text='jackson']]
-    ])
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.text.SimpleDateFormat#<init>(*)')
+    and not(
+        ancestor::PostfixUnaryExpression[
+            pmd-kotlin:matchesSig('com.fasterxml.jackson.databind.ObjectMapper#setDateFormat(*)')
+        ]
+        or ancestor::ClassMemberDeclaration[
+            .//PostfixUnaryExpression[
+                pmd-kotlin:matchesSig('com.fasterxml.jackson.databind.ObjectMapper#setDateFormat(*)')
+            ]
+        ]
+    )
 ]
-|
-(: branch 2: direct constructor use (not as property declaration) with import filter :)
-(//ImportHeader[.//T-Identifier[@Text='java'] and .//T-Identifier[@Text='text']])[1]/../..//ClassMemberDeclaration
-    //T-Identifier[@Text='SimpleDateFormat'
-        and not(ancestor::PropertyDeclaration)
-        and not(ancestor::ClassMemberDeclaration[
-            .//NavigationSuffix[@Identifier='setDateFormat']
-            and //ImportHeader[.//T-Identifier[@Text='fasterxml'] and .//T-Identifier[@Text='jackson']]
-        ])
-    ]
                 ]]></value>
             </property>
         </properties>

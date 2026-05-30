@@ -65,4 +65,29 @@ object Foo {
 }
         ]]></code>
     </test-code>
+    <test-code>
+        <description>violation: SimpleDateFormat as argument in top-level function (no class) - branch 2 misses this</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import java.text.SimpleDateFormat
+
+fun badTopLevel(obj: Unknown) {
+    obj.setDateFormat(SimpleDateFormat("yyyy-MM-dd")) //bad - top-level function, not in a class
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: FQN SimpleDateFormat as argument without import - both branches miss this</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+class Bar {
+    private fun bad() {
+        val unknown = Unknown()
+        unknown.setDateFormat(java.text.SimpleDateFormat("yyyy-MM-dd")) //bad - FQN no import
+    }
+}
+        ]]></code>
+    </test-code>
 </test-data>
