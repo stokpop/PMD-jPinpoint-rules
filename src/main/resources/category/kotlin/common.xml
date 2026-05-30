@@ -17,11 +17,14 @@ externalInfoUrl="${doc_root}/JavaCodePerformance.md#isio01">
             <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
             <property name="xpath">
                 <value><![CDATA[
-//ImportHeader[.//T-Identifier[@Text='java'] and .//T-Identifier[@Text='io']][1]/ancestor::KotlinFile
-//Expression//T-Identifier[(@Text='ByteArrayOutputStream' and ../../../
-PostfixUnarySuffix[1]//ValueArguments[not(ValueArgument) or ValueArgument//T-IntegerLiteral[number(@Text)<=32]])
-or (@Text='StringWriter' and ../../../
-PostfixUnarySuffix[1]//ValueArguments[not(ValueArgument) or ValueArgument//T-IntegerLiteral[number(@Text)<=16]])]
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.io.ByteArrayOutputStream#<init>()')
+    or (pmd-kotlin:matchesSig('java.io.ByteArrayOutputStream#<init>(*)')
+        and .//ValueArguments/ValueArgument//T-IntegerLiteral[number(@Text) <= 32])
+    or pmd-kotlin:matchesSig('java.io.StringWriter#<init>()')
+    or (pmd-kotlin:matchesSig('java.io.StringWriter#<init>(*)')
+        and .//ValueArguments/ValueArgument//T-IntegerLiteral[number(@Text) <= 16])
+]
 ]]>
                 </value>
             </property>

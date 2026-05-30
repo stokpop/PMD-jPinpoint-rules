@@ -47,6 +47,24 @@ class AvoidInMemoryStreamingDefaultConstructor {
     </test-code>
 
     <test-code>
+        <description>FQN usage without import should be flagged</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>3,4</expected-linenumbers>
+        <code><![CDATA[
+class AvoidInMemoryStreamingFqn {
+    fun bad() {
+        val baos = java.io.ByteArrayOutputStream() //bad - FQN no import
+        val sw = java.io.StringWriter() //bad - FQN no import
+    }
+    fun good() {
+        val baos = java.io.ByteArrayOutputStream(8192)
+        val sw = java.io.StringWriter(2048)
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
         <description>Fix Request: false positive in AvoidInMemoryStreamingDefaultConstructor for Kotlin #616</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
