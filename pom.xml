@@ -15,8 +15,8 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring.version>6.2.10</spring.version>
-        <pmd.version>7.24.0-SNAPSHOT</pmd.version>
-        <kotlin-type-mapper.version>0.4.0</kotlin-type-mapper.version>
+        <pmd.version>7.26.0-SNAPSHOT</pmd.version>
+        <kotlin-type-mapper.version>0.5.0</kotlin-type-mapper.version>
     </properties>
 
     <build>
@@ -218,6 +218,12 @@
             <artifactId>joda-time</artifactId>
             <version>2.14.0</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.threeten/threetenbp -->
+        <dependency>
+            <groupId>org.threeten</groupId>
+            <artifactId>threetenbp</artifactId>
+            <version>1.7.1</version>
+        </dependency>
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
@@ -270,7 +276,7 @@
         </dependency>
         <dependency>
             <groupId>nl.stokpop.typemapper</groupId>
-            <artifactId>kotlin-type-mapper-domain</artifactId>
+            <artifactId>kotlin-type-mapper-model</artifactId>
             <version>${kotlin-type-mapper.version}</version>
             <scope>test</scope>
         </dependency>

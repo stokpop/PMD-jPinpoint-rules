@@ -6,10 +6,9 @@
     <test-code>
         <description>Avoid recreation of DateTimeFormatter object.</description>
         <expected-problems>13</expected-problems>
-        <expected-linenumbers>8,14,15,18,22,26,30,34,38,43,55,64,68</expected-linenumbers>
+        <expected-linenumbers>7,13,14,17,21,25,29,33,37,42,54,63,67</expected-linenumbers>
         <code><![CDATA[
 import org.joda.time.format.*
-import org.springframework.format.annotation.DateTimeFormat
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatterBuilder
 
@@ -24,8 +23,8 @@ class Foo {
     val wrong: DateTimeFormatter = ISODateTimeFormat.basicDate() // bad, not static
     var stillWrong: DateTimeFormatter = ISODateTimeFormat.basicDate() // bad, not final, not static
     fun testViolation1(printer: DateTimePrinter?, parser: DateTimeParser?) {
-        var dtf: DateTimeFormatter? = null
-        dtf = DateTimeFormatter(printer, parser) // bad
+        var dtf: org.joda.time.format.DateTimeFormatter? = null
+        dtf = org.joda.time.format.DateTimeFormatter(printer, parser) // bad
     }
 
     fun testViolation2() {
@@ -45,7 +44,7 @@ class Foo {
     }
 
     fun testViolation6(printer: DateTimePrinter?, parser: DateTimeParser?) {
-        stillWrong = DateTimeFormatter(printer, parser) // bad
+        stillWrong = org.joda.time.format.DateTimeFormatter(printer, parser) // bad
     }
 
     fun testViolation7_PCC_171() {
@@ -185,17 +184,17 @@ object Foo {
      ]]></code>
     </test-code>
     <test-code>
-        <description>Flag joda DateTimeFormatter</description>
+        <description>Flag joda DateTimeFormatterBuilder in function body</description>
         <expected-problems>1</expected-problems>
         <expected-linenumbers>6</expected-linenumbers>
         <code><![CDATA[
-import org.joda.time.format.DateTimeFormatter
+import org.joda.time.format.DateTimeFormatterBuilder
 
-object Foo {
+object JodaFormatter {
     private const val DEFAULT_DATETIME_FORMAT = "yyyy-MM-dd"
-    fun format(timestamp: Instant): String {
-        val formatter = DateTimeFormatter.ofPattern(DEFAULT_DATETIME_FORMAT) // bad
-        return formatter.format(timestamp)
+    fun format(timestamp: Long): String {
+        val formatter = DateTimeFormatterBuilder().toFormatter() // bad
+        return formatter.print(timestamp)
     }
 }
 
@@ -259,6 +258,65 @@ class Issue617 {
     }
 }
      ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>Flag joda DateTimeFormat.forPattern as direct call via type resolution (matchesSig)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.joda.time.format.DateTimeFormat
+import org.joda.time.format.DateTimeFormatter
+
+class DirectJodaCall {
+    fun bad(): DateTimeFormatter {
+        val dtf = DateTimeFormat.forPattern("yyy") // bad
+        return dtf
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>Flag java.time DateTimeFormatter.ofPattern as direct call via type resolution (matchesSig)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.time.format.DateTimeFormatter
+
+class DirectJavaTimeCall {
+    fun bad(): DateTimeFormatter {
+        val dtf = DateTimeFormatter.ofPattern("yyy") // bad
+        return dtf
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>Do not flag java.time DateTimeFormatter.ofPattern with function param (matchesSig)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.time.format.DateTimeFormatter
+
+class GoodWithParam {
+    fun good(fmt: String): DateTimeFormatter = DateTimeFormatter.ofPattern(fmt)
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>Do not flag java.time DateTimeFormatter.ofPattern in companion object val (matchesSig)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.time.format.DateTimeFormatter
+
+class GoodCompanion {
+    companion object {
+        val FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    }
+}
+        ]]></code>
     </test-code>
 
     <test-code>
