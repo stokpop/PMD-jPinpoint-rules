@@ -712,6 +712,34 @@ class Foo {
         </example>
     </rule>
 
+    <rule name="LegacyTimeLibraryUsed"
+          language="kotlin"
+          message="Migrate from the legacy time library to java.time for better performance."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#uoslc03">
+        <description>Problem: The JodaTime and ThreeTenBp libraries have non-optimal performance and memory usage.
+            Solution: Migrate to java.time for a modern solution with better performance and less memory usage.
+            If stuck on Java 6 or 7, ThreeTenBp is the best option; then suppress the violation.
+            (jpinpoint-rules)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,memory,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//ImportHeader[.//T-Identifier[@Text='joda'] and .//T-Identifier[@Text='time']][1]
+|
+//ImportHeader[.//T-Identifier[@Text='threeten'] and .//T-Identifier[@Text='bp']][1]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.joda.time.DateTime // bad
+import org.threeten.bp.format.DateTimeFormatter // bad
+import java.time.LocalDateTime // good
+        ]]></example>
+    </rule>
+
     <rule name="UnresolvedType"
           language="kotlin"
           message="A type cannot be resolved. Make sure all dependencies are available on the classpath."
