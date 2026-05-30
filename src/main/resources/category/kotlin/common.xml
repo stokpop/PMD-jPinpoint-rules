@@ -510,12 +510,12 @@ class Foo {
     or (.//T-Identifier[@Text='java'] and .//T-Identifier[@Text='time'] and .//T-Identifier[@Text='format'])
   ][1]/ancestor::KotlinFile
 
-/TopLevelObject//Expression//T-Identifier[
+/TopLevelObject//PrimaryExpression//T-Identifier[
     (@Text='DateTimeFormatter' or @Text='DateTimeFormat' or @Text='DateTimeFormatterBuilder' or @Text='ISODateTimeFormat')
      (: val is "final" and is allowed in CompanionObject :)
      and (not(ancestor::PropertyDeclaration/T-VAL) or (ancestor::PropertyDeclaration/T-VAL and not(ancestor::CompanionObject)))
-     (: and 'final static' is allowed, top level, field outside of class/object :)
-     and (ancestor::ClassDeclaration or ancestor::ObjectDeclaration)
+     (: top-level val/const val is effectively 'final static' and is allowed; inside function body is flagged :)
+     and (ancestor::ClassDeclaration or ancestor::ObjectDeclaration or ancestor::FunctionDeclaration)
      (: do not match explicit type declarations :)
      and not(ancestor::TypeReference)
      (: variable params are allowed, e.g. when it is an incoming function param :)
@@ -532,7 +532,7 @@ class Foo {
     .//T-Identifier[@Text='java'] and .//T-Identifier[@Text='time'] and .//T-Identifier[@Text='format']
   ][1]/ancestor::KotlinFile
 
-/TopLevelObject//Expression//T-Identifier[
+/TopLevelObject//PrimaryExpression//T-Identifier[
     @Text='DateTimeFormatter'
      (: check if variable function params in init constructor with two params :)
      and ancestor::PostfixUnaryExpression/PostfixUnarySuffix//ValueArguments[

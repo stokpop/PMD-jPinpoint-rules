@@ -405,12 +405,12 @@ object GoodAvoidRecompilingXPathExpressionKt {
     or (.//T-Identifier[@Text='java'] and .//T-Identifier[@Text='time'] and .//T-Identifier[@Text='format'])
   ][1]/ancestor::KotlinFile
 
-/TopLevelObject//Expression//T-Identifier[
+/TopLevelObject//PrimaryExpression//T-Identifier[
     (@Text='DateTimeFormatter' or @Text='DateTimeFormat' or @Text='DateTimeFormatterBuilder' or @Text='ISODateTimeFormat')
      (: val is "final" and is allowed in CompanionObject :)
      and (not(ancestor::PropertyDeclaration/T-VAL) or (ancestor::PropertyDeclaration/T-VAL and not(ancestor::CompanionObject)))
-     (: and 'final static' is allowed, top level, field outside of class/object :)
-     and (ancestor::ClassDeclaration or ancestor::ObjectDeclaration)
+     (: top-level val/const val is effectively 'final static' and is allowed; inside function body is flagged :)
+     and (ancestor::ClassDeclaration or ancestor::ObjectDeclaration or ancestor::FunctionDeclaration)
      (: do not match explicit type declarations :)
      and not(ancestor::TypeReference)
      (: variable params are allowed, e.g. when it is an incoming function param :)
@@ -427,7 +427,7 @@ object GoodAvoidRecompilingXPathExpressionKt {
     .//T-Identifier[@Text='java'] and .//T-Identifier[@Text='time'] and .//T-Identifier[@Text='format']
   ][1]/ancestor::KotlinFile
 
-/TopLevelObject//Expression//T-Identifier[
+/TopLevelObject//PrimaryExpression//T-Identifier[
     @Text='DateTimeFormatter'
      (: check if variable function params in init constructor with two params :)
      and ancestor::PostfixUnaryExpression/PostfixUnarySuffix//ValueArguments[
@@ -940,26 +940,19 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
 (: Step 1: Match classes annotated as singletons or shared objects :)
 //ClassDeclaration[
   (
-       pmd-kotlin:hasAnnotation('Service')
-    or pmd-kotlin:hasAnnotation('Component')
-    or pmd-kotlin:hasAnnotation('Controller')
-    or pmd-kotlin:hasAnnotation('Repository')
-    or pmd-kotlin:hasAnnotation('RestController')
-    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
+       pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Repository')
     or pmd-kotlin:hasAnnotation('org.springframework.web.bind.annotation.RestController')
   )
   (: exclude request/prototype scope — not shared :)
-  and not(pmd-kotlin:hasAnnotation('RequestScope')
-       or pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
+  and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
   (: exclude @Scope("request") or @Scope("prototype") :)
   and not(.//Annotation//T-Identifier[@Text='Scope']
       and .//Annotation//T-LineStrText[@Text='request' or @Text='prototype'])
   (: exclude @NotThreadSafe :)
-  and not(pmd-kotlin:hasAnnotation('NotThreadSafe')
-       or pmd-kotlin:hasAnnotation('net.jcip.annotations.NotThreadSafe'))
+  and not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
 ]
 (: Step 2: Find non-private, non-val properties at class level :)
 //PropertyDeclaration[
@@ -971,9 +964,9 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
   and not(T-VAL)
   (: not injection framework annotated :)
   and not(
-       pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+       pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
   )
   (: not in a nested class inside the class body :)
   and not(ancestor::ClassDeclaration[ancestor::ClassBody])
@@ -1019,11 +1012,10 @@ class RootController {
 
 (: Step 1: Match classes that use synchronized and are not @NotThreadSafe :)
 //ClassDeclaration[
-  not(pmd-kotlin:hasAnnotation('NotThreadSafe')
-       or pmd-kotlin:hasAnnotation('net.jcip.annotations.NotThreadSafe'))
+  not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
   and (
     (: has @Synchronized annotated function :)
-    .//FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized') or pmd-kotlin:hasAnnotation('kotlin.jvm.Synchronized')]
+    .//FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized')]
     (: or uses synchronized() block :)
     or .//T-Identifier[@Text='synchronized']
   )
@@ -1035,10 +1027,11 @@ class RootController {
       T-VAR
       and not(ancestor::FunctionBody)
       (: not @Volatile :)
-      and not(pmd-kotlin:hasAnnotation('Volatile') or pmd-kotlin:hasAnnotation('kotlin.jvm.Volatile'))
+      and not(pmd-kotlin:hasAnnotation('Volatile'))
       (: not @GuardedBy :)
       and not(pmd-kotlin:hasAnnotation('GuardedBy') or pmd-kotlin:hasAnnotation('net.jcip.annotations.GuardedBy')
-           or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy'))
+           or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy')
+           or pmd-kotlin:hasAnnotation('com.google.errorprone.annotations.concurrent.GuardedBy'))
     ]/VariableDeclaration/@Identifier
     (: not a function parameter :)
     and not(
@@ -1052,18 +1045,18 @@ class RootController {
     )
   ]
   (: not inside a @Synchronized function :)
-  and not(ancestor::FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized') or pmd-kotlin:hasAnnotation('kotlin.jvm.Synchronized')])
+  and not(ancestor::FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized')])
   (: not inside a synchronized {} block :)
   and not(ancestor::Statement[
     preceding-sibling::*[1][self::Statement]//T-Identifier[@Text='synchronized']
   ])
   (: not inside framework-annotated functions :)
   and not(ancestor::FunctionDeclaration[
-       pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-    or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-    or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+       pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
   ])
   (: not in afterPropertiesSet function :)
   and not(ancestor::FunctionDeclaration[SimpleIdentifier/T-Identifier[@Text='afterPropertiesSet']])
@@ -1120,29 +1113,21 @@ class Good {
 (: Step 1: Match classes annotated as singletons or shared objects :)
 //ClassDeclaration[
   (
-       pmd-kotlin:hasAnnotation('Service')
-    or pmd-kotlin:hasAnnotation('Component')
-    or pmd-kotlin:hasAnnotation('Controller')
-    or pmd-kotlin:hasAnnotation('Repository')
-    or pmd-kotlin:hasAnnotation('RestController')
-    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
+       pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Repository')
     or pmd-kotlin:hasAnnotation('org.springframework.web.bind.annotation.RestController')
   )
   (: exclude request/prototype scope — not shared :)
-  and not(pmd-kotlin:hasAnnotation('RequestScope')
-       or pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
+  and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
   (: exclude @Scope("request") or @Scope("prototype") :)
   and not(.//Annotation//T-Identifier[@Text='Scope']
       and .//Annotation//T-LineStrText[@Text='request' or @Text='prototype'])
   (: exclude @NotThreadSafe :)
-  and not(pmd-kotlin:hasAnnotation('NotThreadSafe')
-       or pmd-kotlin:hasAnnotation('net.jcip.annotations.NotThreadSafe'))
+  and not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
   (: exclude @ConfigurationProperties :)
-  and not(pmd-kotlin:hasAnnotation('ConfigurationProperties')
-       or pmd-kotlin:hasAnnotation('org.springframework.boot.context.properties.ConfigurationProperties'))
+  and not(pmd-kotlin:hasAnnotation('org.springframework.boot.context.properties.ConfigurationProperties'))
 ]
 (: Step 2: Find assignments where the LHS is a var field name :)
 //Assignment[
@@ -1154,10 +1139,11 @@ class Good {
         T-VAR
         and not(ancestor::FunctionBody)
         (: not @Volatile :)
-        and not(pmd-kotlin:hasAnnotation('Volatile') or pmd-kotlin:hasAnnotation('kotlin.jvm.Volatile'))
+        and not(pmd-kotlin:hasAnnotation('Volatile'))
         (: not @GuardedBy :)
         and not(pmd-kotlin:hasAnnotation('GuardedBy') or pmd-kotlin:hasAnnotation('net.jcip.annotations.GuardedBy')
-             or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy'))
+             or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy')
+             or pmd-kotlin:hasAnnotation('com.google.errorprone.annotations.concurrent.GuardedBy'))
       ]/VariableDeclaration/@Identifier
 
       (: ensure this is not just a local var or param with the same name :)
@@ -1187,18 +1173,18 @@ class Good {
     )
   ]
   (: not inside a @Synchronized function :)
-  and not(ancestor::FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized') or pmd-kotlin:hasAnnotation('kotlin.jvm.Synchronized')])
+  and not(ancestor::FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized')])
   (: not inside a synchronized {} block — Kotlin uses synchronized(lock) {} :)
   and not(ancestor::Statement[
     preceding-sibling::*[1][self::Statement]//T-Identifier[@Text='synchronized']
   ] (: simplified check :) )
   (: not inside an @Autowired / @Inject / @PostConstruct / @BeforeStep / @Value annotated function :)
   and not(ancestor::FunctionDeclaration[
-       pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-    or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-    or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+       pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
   ])
   (: not in afterPropertiesSet function :)
   and not(ancestor::FunctionDeclaration[SimpleIdentifier/T-Identifier[@Text='afterPropertiesSet']])
@@ -1254,10 +1240,9 @@ class MyService {
 
 (: Step 1: Match classes that use synchronized and are not @NotThreadSafe :)
 //ClassDeclaration[
-  not(pmd-kotlin:hasAnnotation('NotThreadSafe')
-       or pmd-kotlin:hasAnnotation('net.jcip.annotations.NotThreadSafe'))
+  not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
   and (
-    .//FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized') or pmd-kotlin:hasAnnotation('kotlin.jvm.Synchronized')]
+    .//FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized')]
     or .//T-Identifier[@Text='synchronized']
   )
 ]
@@ -1269,24 +1254,25 @@ class MyService {
     (: Case 1: var field that is not volatile and not guarded :)
     T-VAR
     and not(pmd-kotlin:modifiers()='volatile')
-    and not(pmd-kotlin:hasAnnotation('Volatile') or pmd-kotlin:hasAnnotation('kotlin.jvm.Volatile'))
+    and not(pmd-kotlin:hasAnnotation('Volatile'))
     (: not annotated with framework/GuardedBy :)
     and not(
-         pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-      or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+         pmd-kotlin:hasAnnotation('Autowired')
+      or pmd-kotlin:hasAnnotation('Inject')
       or pmd-kotlin:hasAnnotation('GuardedBy') or pmd-kotlin:hasAnnotation('net.jcip.annotations.GuardedBy')
            or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy')
+           or pmd-kotlin:hasAnnotation('com.google.errorprone.annotations.concurrent.GuardedBy')
     )
     (: @Value field excluded if no unguarded assignment elsewhere in the class :)
     and not(
-      (pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value'))
+      pmd-kotlin:hasAnnotation('Value')
       and not(
         VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//Assignment//T-Identifier[
           not(ancestor::FunctionDeclaration[
-               pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-            or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-            or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-            or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+               pmd-kotlin:hasAnnotation('Autowired')
+            or pmd-kotlin:hasAnnotation('PostConstruct')
+            or pmd-kotlin:hasAnnotation('Value')
+            or pmd-kotlin:hasAnnotation('Inject')
           ])
         ]/@Text
       )
@@ -1294,19 +1280,19 @@ class MyService {
     (: not assigned only in framework-annotated functions :)
     and not(
       VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//FunctionDeclaration[
-           pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-        or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-        or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-        or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-        or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+           pmd-kotlin:hasAnnotation('Autowired')
+        or pmd-kotlin:hasAnnotation('PostConstruct')
+        or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+        or pmd-kotlin:hasAnnotation('Value')
+        or pmd-kotlin:hasAnnotation('Inject')
       ]//Assignment//(DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text
       and not(
         VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//FunctionDeclaration[not(
-             pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-          or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-          or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-          or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-          or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+             pmd-kotlin:hasAnnotation('Autowired')
+          or pmd-kotlin:hasAnnotation('PostConstruct')
+          or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+          or pmd-kotlin:hasAnnotation('Value')
+          or pmd-kotlin:hasAnnotation('Inject')
         )]//Assignment//(DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text
       )
     )
@@ -1315,7 +1301,8 @@ class MyService {
   (
     (: Case 2: field of known mutable type, even if val :)
     not(pmd-kotlin:hasAnnotation('GuardedBy') or pmd-kotlin:hasAnnotation('net.jcip.annotations.GuardedBy')
-         or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy'))
+         or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy')
+         or pmd-kotlin:hasAnnotation('com.google.errorprone.annotations.concurrent.GuardedBy'))
     and (
       pmd-kotlin:typeIs('java.util.Date')
       or pmd-kotlin:typeIs('java.lang.StringBuilder')
@@ -1379,30 +1366,22 @@ class Good {
 (: Step 1: Match singleton/shared-object classes :)
 //ClassDeclaration[
   (
-       pmd-kotlin:hasAnnotation('Service')
-    or pmd-kotlin:hasAnnotation('Component')
-    or pmd-kotlin:hasAnnotation('Controller')
-    or pmd-kotlin:hasAnnotation('Repository')
-    or pmd-kotlin:hasAnnotation('RestController')
-    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
+       pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Repository')
     or pmd-kotlin:hasAnnotation('org.springframework.web.bind.annotation.RestController')
   )
   (: exclude request/prototype scope :)
-  and not(pmd-kotlin:hasAnnotation('RequestScope')
-       or pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
+  and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
   and not(.//Annotation//T-Identifier[@Text='Scope']
       and .//Annotation//T-LineStrText[@Text='request' or @Text='prototype'])
   (: exclude @NotThreadSafe :)
-  and not(pmd-kotlin:hasAnnotation('NotThreadSafe')
-       or pmd-kotlin:hasAnnotation('net.jcip.annotations.NotThreadSafe'))
+  and not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
   (: exclude @ConfigurationProperties unless has Setter annotation :)
   and not(
-    (pmd-kotlin:hasAnnotation('ConfigurationProperties')
-     or pmd-kotlin:hasAnnotation('org.springframework.boot.context.properties.ConfigurationProperties'))
-    and not(pmd-kotlin:hasAnnotation('Setter') or pmd-kotlin:hasAnnotation('lombok.Setter'))
+    (pmd-kotlin:hasAnnotation('org.springframework.boot.context.properties.ConfigurationProperties'))
+    and not(pmd-kotlin:hasAnnotation('lombok.Setter'))
   )
 ]
 (: Step 2: Find var fields that are not guarded :)
@@ -1413,24 +1392,25 @@ class Good {
     (: Case 1: var field that is not volatile and not guarded :)
     T-VAR
     and not(pmd-kotlin:modifiers()='volatile')
-    and not(pmd-kotlin:hasAnnotation('Volatile') or pmd-kotlin:hasAnnotation('kotlin.jvm.Volatile'))
+    and not(pmd-kotlin:hasAnnotation('Volatile'))
     (: not annotated with framework/GuardedBy :)
     and not(
-         pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-      or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+         pmd-kotlin:hasAnnotation('Autowired')
+      or pmd-kotlin:hasAnnotation('Inject')
       or pmd-kotlin:hasAnnotation('GuardedBy') or pmd-kotlin:hasAnnotation('net.jcip.annotations.GuardedBy')
            or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy')
+           or pmd-kotlin:hasAnnotation('com.google.errorprone.annotations.concurrent.GuardedBy')
     )
     (: @Value field excluded if no unguarded assignment elsewhere in the class :)
     and not(
-      (pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value'))
+      pmd-kotlin:hasAnnotation('Value')
       and not(
         VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//Assignment//T-Identifier[
           not(ancestor::FunctionDeclaration[
-               pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-            or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-            or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-            or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+               pmd-kotlin:hasAnnotation('Autowired')
+            or pmd-kotlin:hasAnnotation('PostConstruct')
+            or pmd-kotlin:hasAnnotation('Value')
+            or pmd-kotlin:hasAnnotation('Inject')
           ])
         ]/@Text
       )
@@ -1438,19 +1418,19 @@ class Good {
     (: not assigned only in framework-annotated functions :)
     and not(
       VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//FunctionDeclaration[
-           pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-        or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-        or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-        or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-        or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+           pmd-kotlin:hasAnnotation('Autowired')
+        or pmd-kotlin:hasAnnotation('PostConstruct')
+        or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+        or pmd-kotlin:hasAnnotation('Value')
+        or pmd-kotlin:hasAnnotation('Inject')
       ]//Assignment//(DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text
       and not(
         VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//FunctionDeclaration[not(
-             pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-          or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-          or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-          or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-          or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+             pmd-kotlin:hasAnnotation('Autowired')
+          or pmd-kotlin:hasAnnotation('PostConstruct')
+          or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+          or pmd-kotlin:hasAnnotation('Value')
+          or pmd-kotlin:hasAnnotation('Inject')
         )]//Assignment//(DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text
       )
     )
@@ -1459,7 +1439,8 @@ class Good {
   (
     (: Case 2: field of known mutable type, even if val :)
     not(pmd-kotlin:hasAnnotation('GuardedBy') or pmd-kotlin:hasAnnotation('net.jcip.annotations.GuardedBy')
-         or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy'))
+         or pmd-kotlin:hasAnnotation('javax.annotation.concurrent.GuardedBy')
+         or pmd-kotlin:hasAnnotation('com.google.errorprone.annotations.concurrent.GuardedBy'))
     and (
       pmd-kotlin:typeIs('java.util.Date')
       or pmd-kotlin:typeIs('java.lang.StringBuilder')
@@ -1523,30 +1504,22 @@ class BadMutableTypes {
 (: Step 1: Match singleton/shared-object classes :)
 //ClassDeclaration[
   (
-       pmd-kotlin:hasAnnotation('Service')
-    or pmd-kotlin:hasAnnotation('Component')
-    or pmd-kotlin:hasAnnotation('Controller')
-    or pmd-kotlin:hasAnnotation('Repository')
-    or pmd-kotlin:hasAnnotation('RestController')
-    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
+       pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller')
     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Repository')
     or pmd-kotlin:hasAnnotation('org.springframework.web.bind.annotation.RestController')
   )
   (: exclude request/prototype scope :)
-  and not(pmd-kotlin:hasAnnotation('RequestScope')
-       or pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
+  and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
   and not(.//Annotation//T-Identifier[@Text='Scope']
       and .//Annotation//T-LineStrText[@Text='request' or @Text='prototype'])
   (: exclude @NotThreadSafe :)
-  and not(pmd-kotlin:hasAnnotation('NotThreadSafe')
-       or pmd-kotlin:hasAnnotation('net.jcip.annotations.NotThreadSafe'))
+  and not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
   (: exclude @ConfigurationProperties unless has Setter annotation :)
   and not(
-    (pmd-kotlin:hasAnnotation('ConfigurationProperties')
-     or pmd-kotlin:hasAnnotation('org.springframework.boot.context.properties.ConfigurationProperties'))
-    and not(pmd-kotlin:hasAnnotation('Setter') or pmd-kotlin:hasAnnotation('lombok.Setter'))
+    (pmd-kotlin:hasAnnotation('org.springframework.boot.context.properties.ConfigurationProperties'))
+    and not(pmd-kotlin:hasAnnotation('lombok.Setter'))
   )
   (: class must have a supertype (extends a class or implements interface) :)
   and .//DelegationSpecifier
@@ -1567,18 +1540,18 @@ class BadMutableTypes {
     and not(@Text = ancestor::FunctionBody[1]//PropertyDeclaration/VariableDeclaration/@Identifier)
   ]
   (: not inside a @Synchronized function :)
-  and not(ancestor::FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized') or pmd-kotlin:hasAnnotation('kotlin.jvm.Synchronized')])
+  and not(ancestor::FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized')])
   (: not inside a synchronized {} block - check if inside lambda of synchronized() call :)
   and not(ancestor::LambdaLiteral[
     ancestor::PostfixUnaryExpression[PrimaryExpression//T-Identifier[@Text='synchronized']]
   ])
   (: not inside framework-annotated functions :)
   and not(ancestor::FunctionDeclaration[
-       pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-    or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-    or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+       pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
   ])
   (: not in afterPropertiesSet function :)
   and not(ancestor::FunctionDeclaration[SimpleIdentifier/T-Identifier[@Text='afterPropertiesSet']])
@@ -1634,11 +1607,11 @@ class Good : SomeParent() {
 //FunctionDeclaration[
   ancestor::ClassBody
   and not(
-    pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-    or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-    or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
   )
 ]//Assignment[
   (: assignment target matches a @GuardedBy(fieldName) field where fieldName IS a property :)
@@ -1670,11 +1643,11 @@ class Good : SomeParent() {
 //FunctionDeclaration[
   ancestor::ClassBody
   and not(
-    pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-    or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-    or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
   )
 ]//PrimaryExpression[
   ancestor::FunctionBody
@@ -1706,11 +1679,11 @@ class Good : SomeParent() {
 //FunctionDeclaration[
   ancestor::ClassBody
   and not(
-    pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-    or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-    or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
   )
 ]//Assignment[
   (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
@@ -1728,11 +1701,11 @@ class Good : SomeParent() {
 //FunctionDeclaration[
   ancestor::ClassBody
   and not(
-    pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-    or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-    or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
   )
 ]//PrimaryExpression[
   ancestor::FunctionBody
@@ -1801,14 +1774,14 @@ class Good {
 //FunctionDeclaration[
   ancestor::ClassBody
   and not(
-    pmd-kotlin:hasAnnotation('Synchronized') or pmd-kotlin:hasAnnotation('kotlin.jvm.Synchronized')
+    pmd-kotlin:hasAnnotation('Synchronized')
   )
   and not(
-    pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-    or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-    or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
   )
 ]//Assignment[
   (: assignment target matches a @GuardedBy("this") field :)
@@ -1831,14 +1804,14 @@ class Good {
 //FunctionDeclaration[
   ancestor::ClassBody
   and not(
-    pmd-kotlin:hasAnnotation('Synchronized') or pmd-kotlin:hasAnnotation('kotlin.jvm.Synchronized')
+    pmd-kotlin:hasAnnotation('Synchronized')
   )
   and not(
-    pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Autowired')
-    or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct') or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
-    or pmd-kotlin:hasAnnotation('BeforeStep') or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
-    or pmd-kotlin:hasAnnotation('Value') or pmd-kotlin:hasAnnotation('org.springframework.beans.factory.annotation.Value')
-    or pmd-kotlin:hasAnnotation('Inject') or pmd-kotlin:hasAnnotation('javax.inject.Inject') or pmd-kotlin:hasAnnotation('jakarta.inject.Inject')
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
   )
 ]//PrimaryExpression[
   (: must be inside function body :)
@@ -1920,7 +1893,7 @@ class Good {
   //Annotation[.//T-Identifier[@Text='GuardedBy']]
     //T-LineStrText[@Text = 'this'
       and not(ancestor::ClassBody[1]//FunctionDeclaration[
-        pmd-kotlin:hasAnnotation('Synchronized') or pmd-kotlin:hasAnnotation('kotlin.jvm.Synchronized')
+        pmd-kotlin:hasAnnotation('Synchronized')
       ])
       and not(ancestor::ClassBody[1]//PostfixUnaryExpression[
         PrimaryExpression//T-Identifier[@Text='synchronized']

@@ -261,4 +261,40 @@ class Issue617 {
      ]]></code>
     </test-code>
 
+    <test-code>
+       <description>Flag nested java.time DateTimeFormatter.ofPattern inside class method</description>
+       <expected-problems>1</expected-problems>
+       <expected-linenumbers>6</expected-linenumbers>
+       <code><![CDATA[
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
+class Mapper {
+    fun mapRaw(raw: String): LocalDate =
+        LocalDate.parse(raw, DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+}
+     ]]></code>
+    </test-code>
+
+    <test-code>
+       <description>Flag nested java.time DateTimeFormatter.ofPattern in top-level function</description>
+       <expected-problems>1</expected-problems>
+       <expected-linenumbers>12</expected-linenumbers>
+       <code><![CDATA[
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
+data class TinyRec(
+    val a: LocalDate,
+    val b: LocalDate?
+)
+
+fun mapRaw(raw: String): LocalDate =
+    LocalDate.parse(
+       raw,
+       DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    )
+     ]]></code>
+    </test-code>
+
 </test-data>
