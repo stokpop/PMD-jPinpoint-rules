@@ -304,7 +304,8 @@ class GoodKotlinMdc {
             <property name="xpath">
                 <value><![CDATA[
 (: requires kotlin-type-mapper auxClasspath; matchesSig replaces import filter :)
-//FunctionBody[.//PostfixUnaryExpression[pmd-kotlin:matchesSig('javax.xml.xpath.XPathFactory#newXPath()')]]
+(: match FunctionBody or LambdaLiteral that contains a newXPath() call :)
+//(FunctionBody|LambdaLiteral)[.//PostfixUnaryExpression[pmd-kotlin:matchesSig('javax.xml.xpath.XPathFactory#newXPath()')]]
 //PostfixUnaryExpression[
     (pmd-kotlin:matchesSig('javax.xml.xpath.XPath#compile(*)')
      or pmd-kotlin:matchesSig('javax.xml.xpath.XPath#evaluate(_,_,_)')

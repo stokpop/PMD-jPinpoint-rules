@@ -49,4 +49,22 @@ object GoodAvoidRecompilingXPathExpressionKt {
 ]]></code>
     </test-code>
 
+    <test-code>
+        <description>violation: AvoidRecompilingXPathExpression inside lambda</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>8</expected-linenumbers>
+        <code><![CDATA[
+import org.w3c.dom.Document
+import org.w3c.dom.NodeList
+import javax.xml.xpath.*
+
+class Foo {
+    val queryAll: (Document?) -> NodeList = { doc ->
+        val xpath: XPath = XPathFactory.newInstance().newXPath()
+        xpath.compile("//book/title/text()").evaluate(doc, XPathConstants.NODESET) as NodeList // bad
+    }
+}
+]]></code>
+    </test-code>
+
 </test-data>
