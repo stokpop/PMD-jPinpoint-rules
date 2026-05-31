@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: numeric Kotlin property and parameters missing time units</description>
+        <expected-problems>3</expected-problems>
+        <expected-linenumbers>2,3,4</expected-linenumbers>
+        <code><![CDATA[
+class TimeUnitConfusion {
+    val connectionTimeout: Int = 5000 // bad
+    fun setTtl(ttl: Long) = ttl // bad
+    fun process(requestTime: Long) = requestTime // bad
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: Duration and non-time identifiers</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+class GoodTimeUnits {
+    fun setTimeout(timeout: Duration) = timeout
+    val name: String = "ok"
+    val connectionTimeout: Duration = 5.seconds
+}
+]]></code>
+    </test-code>
+</test-data>

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: mutable orderId in Spring service</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.stereotype.Service
+@Service
+class OrderService {
+    var orderId: String = "" // bad
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: mutable userId in Spring component</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+@Component
+class UserHandler {
+    var userId: String? = null // bad
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: immutable property in Spring service</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Service
+@Service
+class ImmutableOrderService {
+    val orderId: String = ""
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: request scoped controller</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.context.annotation.RequestScope
+@RestController
+@RequestScope
+class OrderController {
+    var orderId: String = ""
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: non-Spring class</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class PlainOrderService {
+    var orderId: String = ""
+}
+]]></code>
+    </test-code>
+</test-data>

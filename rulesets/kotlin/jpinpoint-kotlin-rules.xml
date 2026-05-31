@@ -711,6 +711,65 @@ class AvoidStringBuffer {
         </example>
     </rule>
 
+    <rule name="AvoidTimeUnitConfusion"
+          message="Numeric time-related properties or parameters should use an explicit time unit type."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ituc01">
+        <description>Problem: numeric time-related values such as timeout or ttl are ambiguous without an explicit unit.&#13;
+            Solution: use a type with unit semantics, such as kotlin.time.Duration, or encode the unit clearly in the identifier. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    (pmd-kotlin:typeIs('kotlin.Int') or pmd-kotlin:typeIs('kotlin.Long')
+     or pmd-kotlin:typeIs('java.lang.Integer') or pmd-kotlin:typeIs('java.lang.Long'))
+    and (
+        ends-with(lower-case(VariableDeclaration/@Identifier), 'timetolive')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'time_to_live')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'time')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'timeout')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'time_out')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'duration')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'durationout')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'duration_out')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'ttl')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'timestamp')
+    )
+]
+|
+//FunctionValueParameter[
+    (pmd-kotlin:typeIs('kotlin.Int') or pmd-kotlin:typeIs('kotlin.Long')
+     or pmd-kotlin:typeIs('java.lang.Integer') or pmd-kotlin:typeIs('java.lang.Long'))
+    and (
+        ends-with(lower-case(Parameter/@Identifier), 'timetolive')
+        or ends-with(lower-case(Parameter/@Identifier), 'time_to_live')
+        or ends-with(lower-case(Parameter/@Identifier), 'time')
+        or ends-with(lower-case(Parameter/@Identifier), 'timeout')
+        or ends-with(lower-case(Parameter/@Identifier), 'time_out')
+        or ends-with(lower-case(Parameter/@Identifier), 'duration')
+        or ends-with(lower-case(Parameter/@Identifier), 'durationout')
+        or ends-with(lower-case(Parameter/@Identifier), 'duration_out')
+        or ends-with(lower-case(Parameter/@Identifier), 'ttl')
+        or ends-with(lower-case(Parameter/@Identifier), 'timestamp')
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad {
+    val connectionTimeout: Int = 5000 // bad
+    fun setTtl(ttl: Long) = ttl // bad
+}
+class Good {
+    fun setTimeout(timeout: kotlin.time.Duration) = timeout // good
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidWideScopeXPathExpression"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
@@ -800,6 +859,41 @@ class FooGood {
 }
 ]]>
         </example>
+    </rule>
+
+    <rule name="AvoidXPathUsage"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="XPathFactory.newInstance is used. XPathFactory creation is expensive and should be reused safely."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ix03">
+        <description>Problem: creating XPathFactory instances repeatedly is expensive.&#13;
+            Solution: reuse the factory and, when shared across threads, store it in a ThreadLocal. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('javax.xml.xpath.XPathFactory#newInstance(*)')
+    and not(ancestor::PropertyDeclaration[
+        not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+        and pmd-kotlin:typeIs('java.lang.ThreadLocal')
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import javax.xml.xpath.XPathFactory
+class Bad {
+    fun bad() {
+        val xpath = XPathFactory.newInstance().newXPath() // bad
+    }
+}
+class Good {
+    private val xpathFactory: ThreadLocal<javax.xml.xpath.XPathFactory> = ThreadLocal.withInitial { XPathFactory.newInstance() }
+}
+        ]]></example>
     </rule>
 
     <rule name="BufferFileStreaming"
@@ -2388,6 +2482,44 @@ class Good : SomeParent() {
         ]]></example>
     </rule>
 
+    <rule name="AvoidUserDataInSharedObjects"
+          message="Avoid storing user-specific mutable data in shared singleton objects."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#isc03">
+        <description>Problem: mutable user-related fields in singleton Spring beans can leak data between requests.&#13;
+            Solution: keep request data local, immutable, or scope the bean to the request. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="data-mix-up,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//ClassDeclaration[
+    (pmd-kotlin:hasAnnotation('Service')
+     or pmd-kotlin:hasAnnotation('Component')
+     or pmd-kotlin:hasAnnotation('Controller')
+     or pmd-kotlin:hasAnnotation('Repository')
+     or pmd-kotlin:hasAnnotation('RestController'))
+    and not(pmd-kotlin:hasAnnotation('Scope'))
+    and not(pmd-kotlin:hasAnnotation('RequestScope'))
+]//PropertyDeclaration[
+    @Mutable = true()
+    and not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and not(pmd-kotlin:hasAnnotation('Volatile'))
+    and matches(lower-case(VariableDeclaration/@Identifier), '^(user(id|ref|reference)?|customer(id|ref|reference)?|session(id|ref|reference)?|order(id|ref|reference|list)?|account(id|ref|reference|list)?|transaction(id|ref|reference|list)?|contract(id|ref|reference|list)?)$')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.stereotype.Service
+@Service
+class OrderService {
+    var orderId: String = "" // bad
+}
+        ]]></example>
+    </rule>
+
     <rule name="NotProperlySynchronizingOnFieldWhileUsingGuardedBy"
           language="kotlin"
           message="Not properly synchronizing access of field while using @GuardedBy(field)"
@@ -2662,6 +2794,44 @@ class Good {
         ]]></example>
     </rule>
 
+    <rule name="SetQueueCapacityForTaskExecutor"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Configure the queue capacity for the ThreadPoolTaskExecutor."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#isqc01">
+        <description>The org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor queue capacity is not configured.
+            Problem: the default queue capacity is unlimited and may lead to out of memory situations.&#13;
+            Solution: call setQueueCapacity, for instance with a value equal to corePoolSize. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,memory,performance,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//FunctionBody[
+    .//T-Identifier[@Text='ThreadPoolTaskExecutor']
+    and .//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/@Identifier = ('setCorePoolSize','setMaxPoolSize')
+        or PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = ('setCorePoolSize','setMaxPoolSize')
+    ]
+    and not(.//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/@Identifier = 'setQueueCapacity'
+        or PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = 'setQueueCapacity'
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+class ExecutorConfig {
+    fun bad() = ThreadPoolTaskExecutor().apply {
+        setCorePoolSize(10)
+        setMaxPoolSize(20)
+    } // bad
+}
+        ]]></example>
+    </rule>
+
     <rule name="SynchronizingForLocalVars"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
@@ -2792,6 +2962,36 @@ class RightUseOfGuardedBy {
 
 <!-- END Included file 'concurrent.xml' -->
 <!-- BEGIN Included file 'remoting.xml' -->
+    <rule name="AvoidDeprecatedHttpConnectors"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid the use of deprecated/thread-unsafe HTTP connectors"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#idhc01">
+        <description>Problem: Several HTTP client connection managers are thread-unsafe or deprecated.&#13;
+            Solution: upgrade to modern Apache HttpClient APIs and use supported pooling clients. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="data-mix-up,deprecated,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//ImportHeader[
+    starts-with(@Name, 'org.apache.commons.httpclient')
+    or starts-with(@Name, 'org.apache.http.conn.ClientConnectionManager')
+    or starts-with(@Name, 'org.apache.http.impl.conn.PoolingClientConnectionManager')
+    or starts-with(@Name, 'org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager')
+    or starts-with(@Name, 'org.apache.http.impl.conn.SingleClientConnManager')
+    or starts-with(@Name, 'org.apache.http.impl.client.DefaultHttpClient')
+    or starts-with(@Name, 'org.apache.http.impl.client.SystemDefaultHttpClient')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.commons.httpclient.HttpClient // bad
+import org.apache.hc.client5.http.classic.HttpClient // good
+        ]]></example>
+    </rule>
+
     <rule name="AvoidDeprecatedHystrix"
           language="kotlin"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
@@ -2812,6 +3012,43 @@ class RightUseOfGuardedBy {
         </properties>
         <example>
         </example>
+    </rule>
+
+    <rule name="AvoidHardcodedConnectionConfig"
+          message="Avoid hardcoded connection configuration."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ihcc01">
+        <description>Problem: configuring connection settings like timeouts and pool sizes in code makes them difficult to manage and tune.&#13;
+            Solution: externalize these values to configuration or use richer types such as Duration. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and not(pmd-kotlin:hasAnnotation('Value'))
+    and (pmd-kotlin:typeIs('kotlin.Int') or pmd-kotlin:typeIs('kotlin.Long')
+         or pmd-kotlin:typeIs('java.lang.Integer') or pmd-kotlin:typeIs('java.lang.Long'))
+    and (
+        matches(lower-case(VariableDeclaration/@Identifier), '.*(timeout|time_out|durationout|duration_out|timetolive|time_to_live).*')
+        or (contains(lower-case(VariableDeclaration/@Identifier), 'max') and contains(lower-case(VariableDeclaration/@Identifier), 'route'))
+    )
+    and .//T-IntegerLiteral
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class BadConnectionConfig {
+    private val connectionTimeout: Int = 5000 // bad
+}
+class GoodConnectionConfig {
+    @org.springframework.beans.factory.annotation.Value("\${app.timeout}")
+    private val connectionTimeout: Int = 0 // good
+}
+        ]]></example>
     </rule>
 
     <rule name="AvoidHttpHostOneArgumentConstructor"
@@ -3140,6 +3377,40 @@ class Bad(delegate: ClientHttpRequestFactory) {
 }
         ]]>
         </example>
+    </rule>
+
+    <rule name="DefaultFeignClientWithoutTLSConnectionReuse"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Default Feign client is used with (mutual) TLS. This is HttpURLConnection that creates a new connection for each call with TLS overhead."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi18">
+        <description>Problem: the default http client of Feign is java.net.HttpURLConnection and does not pool connections when using mTLS.&#13;
+            Solution: switch to a Feign client that supports HTTP connection pooling with TLS reuse, such as OkHttp-backed Feign. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PrimaryExpression/SimpleIdentifier/T-Identifier/@Text='Client'
+    and PostfixUnarySuffix[1]/NavigationSuffix/@Identifier='Default'
+    and PostfixUnarySuffix[2]/CallSuffix/ValueArguments/ValueArgument[2]
+    and PostfixUnarySuffix[2]/CallSuffix/ValueArguments/ValueArgument[1]//T-Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import feign.Client
+class MyFeignClient {
+    fun bad(socketFactory: javax.net.ssl.SSLSocketFactory, hostnameVerifier: javax.net.ssl.HostnameVerifier): Client {
+        return Client.Default(socketFactory, hostnameVerifier) // bad
+    }
+    fun good(): Client {
+        return Client.Default(null, null) // good
+    }
+}
+        ]]></example>
     </rule>
 
     <rule name="GsonCreatedForEachMethodCall"

@@ -1665,4 +1665,79 @@ class SyncService {
         ]]></example>
     </rule>
 
+    <rule name="SetQueueCapacityForTaskExecutor"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Configure the queue capacity for the ThreadPoolTaskExecutor."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isqc01">
+        <description>The org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor queue capacity is not configured.
+            Problem: the default queue capacity is unlimited and may lead to out of memory situations.&#13;
+            Solution: call setQueueCapacity, for instance with a value equal to corePoolSize. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,memory,performance,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//FunctionBody[
+    .//T-Identifier[@Text='ThreadPoolTaskExecutor']
+    and .//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/@Identifier = ('setCorePoolSize','setMaxPoolSize')
+        or PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = ('setCorePoolSize','setMaxPoolSize')
+    ]
+    and not(.//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/@Identifier = 'setQueueCapacity'
+        or PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = 'setQueueCapacity'
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+class ExecutorConfig {
+    fun bad() = ThreadPoolTaskExecutor().apply {
+        setCorePoolSize(10)
+        setMaxPoolSize(20)
+    } // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidUserDataInSharedObjects"
+          message="Avoid storing user-specific mutable data in shared singleton objects."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isc03">
+        <description>Problem: mutable user-related fields in singleton Spring beans can leak data between requests.&#13;
+            Solution: keep request data local, immutable, or scope the bean to the request. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="data-mix-up,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//ClassDeclaration[
+    (pmd-kotlin:hasAnnotation('Service')
+     or pmd-kotlin:hasAnnotation('Component')
+     or pmd-kotlin:hasAnnotation('Controller')
+     or pmd-kotlin:hasAnnotation('Repository')
+     or pmd-kotlin:hasAnnotation('RestController'))
+    and not(pmd-kotlin:hasAnnotation('Scope'))
+    and not(pmd-kotlin:hasAnnotation('RequestScope'))
+]//PropertyDeclaration[
+    @Mutable = true()
+    and not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and not(pmd-kotlin:hasAnnotation('Volatile'))
+    and matches(lower-case(VariableDeclaration/@Identifier), '^(user(id|ref|reference)?|customer(id|ref|reference)?|session(id|ref|reference)?|order(id|ref|reference|list)?|account(id|ref|reference|list)?|transaction(id|ref|reference|list)?|contract(id|ref|reference|list)?)$')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.stereotype.Service
+@Service
+class OrderService {
+    var orderId: String = "" // bad
+}
+        ]]></example>
+    </rule>
 </ruleset>

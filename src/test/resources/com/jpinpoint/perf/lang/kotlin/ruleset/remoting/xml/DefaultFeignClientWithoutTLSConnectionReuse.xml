@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: Client.Default with non-null ssl socket factory</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import feign.Client
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.SSLSocketFactory
+class BadFeignClient {
+    fun bad(socketFactory: SSLSocketFactory, hostnameVerifier: HostnameVerifier): Client {
+        return Client.Default(socketFactory, hostnameVerifier) // bad
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: Client.Default with null arguments</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import feign.Client
+class GoodDefaultFeignClient {
+    fun good(): Client {
+        return Client.Default(null, null)
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: OkHttp-backed Feign client</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import feign.Client
+import feign.okhttp.OkHttpClient
+class GoodOkHttpFeignClient {
+    fun good(): Client {
+        return OkHttpClient()
+    }
+}
+]]></code>
+    </test-code>
+</test-data>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: XPathFactory.newInstance in function body</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.xpath.XPathFactory
+class XPathUsageInFunction {
+    fun bad() {
+        val xpath = XPathFactory.newInstance().newXPath() // bad
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: XPathFactory.newInstance in class property initializer</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.xpath.XPathFactory
+class XPathUsageAsProperty {
+    private val xpathFactory = XPathFactory.newInstance() // bad
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: XPathFactory stored in ThreadLocal property</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.xpath.XPathFactory
+class GoodThreadLocalFactory {
+    private val xpathFactory: ThreadLocal<javax.xml.xpath.XPathFactory> = ThreadLocal.withInitial { XPathFactory.newInstance() }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: idiomatic ThreadLocal.withInitial for XPath</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.xpath.XPath
+import javax.xml.xpath.XPathFactory
+class GoodThreadLocalXPath {
+    val threadLocalXpath: ThreadLocal<XPath> = ThreadLocal.withInitial { XPathFactory.newInstance().newXPath() }
+}
+]]></code>
+    </test-code>
+</test-data>

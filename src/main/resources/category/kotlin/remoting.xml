@@ -779,4 +779,104 @@ class MapperService {
         ]]></example>
     </rule>
 
+    <rule name="AvoidDeprecatedHttpConnectors"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid the use of deprecated/thread-unsafe HTTP connectors"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#idhc01">
+        <description>Problem: Several HTTP client connection managers are thread-unsafe or deprecated.&#13;
+            Solution: upgrade to modern Apache HttpClient APIs and use supported pooling clients. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="data-mix-up,deprecated,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//ImportHeader[
+    starts-with(@Name, 'org.apache.commons.httpclient')
+    or starts-with(@Name, 'org.apache.http.conn.ClientConnectionManager')
+    or starts-with(@Name, 'org.apache.http.impl.conn.PoolingClientConnectionManager')
+    or starts-with(@Name, 'org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager')
+    or starts-with(@Name, 'org.apache.http.impl.conn.SingleClientConnManager')
+    or starts-with(@Name, 'org.apache.http.impl.client.DefaultHttpClient')
+    or starts-with(@Name, 'org.apache.http.impl.client.SystemDefaultHttpClient')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.commons.httpclient.HttpClient // bad
+import org.apache.hc.client5.http.classic.HttpClient // good
+        ]]></example>
+    </rule>
+
+    <rule name="DefaultFeignClientWithoutTLSConnectionReuse"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Default Feign client is used with (mutual) TLS. This is HttpURLConnection that creates a new connection for each call with TLS overhead."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi18">
+        <description>Problem: the default http client of Feign is java.net.HttpURLConnection and does not pool connections when using mTLS.&#13;
+            Solution: switch to a Feign client that supports HTTP connection pooling with TLS reuse, such as OkHttp-backed Feign. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PrimaryExpression/SimpleIdentifier/T-Identifier/@Text='Client'
+    and PostfixUnarySuffix[1]/NavigationSuffix/@Identifier='Default'
+    and PostfixUnarySuffix[2]/CallSuffix/ValueArguments/ValueArgument[2]
+    and PostfixUnarySuffix[2]/CallSuffix/ValueArguments/ValueArgument[1]//T-Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import feign.Client
+class MyFeignClient {
+    fun bad(socketFactory: javax.net.ssl.SSLSocketFactory, hostnameVerifier: javax.net.ssl.HostnameVerifier): Client {
+        return Client.Default(socketFactory, hostnameVerifier) // bad
+    }
+    fun good(): Client {
+        return Client.Default(null, null) // good
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidHardcodedConnectionConfig"
+          message="Avoid hardcoded connection configuration."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ihcc01">
+        <description>Problem: configuring connection settings like timeouts and pool sizes in code makes them difficult to manage and tune.&#13;
+            Solution: externalize these values to configuration or use richer types such as Duration. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and not(pmd-kotlin:hasAnnotation('Value'))
+    and (pmd-kotlin:typeIs('kotlin.Int') or pmd-kotlin:typeIs('kotlin.Long')
+         or pmd-kotlin:typeIs('java.lang.Integer') or pmd-kotlin:typeIs('java.lang.Long'))
+    and (
+        matches(lower-case(VariableDeclaration/@Identifier), '.*(timeout|time_out|durationout|duration_out|timetolive|time_to_live).*')
+        or (contains(lower-case(VariableDeclaration/@Identifier), 'max') and contains(lower-case(VariableDeclaration/@Identifier), 'route'))
+    )
+    and .//T-IntegerLiteral
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class BadConnectionConfig {
+    private val connectionTimeout: Int = 5000 // bad
+}
+class GoodConnectionConfig {
+    @org.springframework.beans.factory.annotation.Value("\${app.timeout}")
+    private val connectionTimeout: Int = 0 // good
+}
+        ]]></example>
+    </rule>
 </ruleset>

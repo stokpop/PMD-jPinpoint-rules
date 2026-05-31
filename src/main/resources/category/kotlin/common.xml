@@ -1116,4 +1116,97 @@ class LoggingService(private val log: Logger) {
         ]]></example>
     </rule>
 
+    <rule name="AvoidXPathUsage"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="XPathFactory.newInstance is used. XPathFactory creation is expensive and should be reused safely."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ix03">
+        <description>Problem: creating XPathFactory instances repeatedly is expensive.&#13;
+            Solution: reuse the factory and, when shared across threads, store it in a ThreadLocal. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('javax.xml.xpath.XPathFactory#newInstance(*)')
+    and not(ancestor::PropertyDeclaration[
+        not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+        and pmd-kotlin:typeIs('java.lang.ThreadLocal')
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import javax.xml.xpath.XPathFactory
+class Bad {
+    fun bad() {
+        val xpath = XPathFactory.newInstance().newXPath() // bad
+    }
+}
+class Good {
+    private val xpathFactory: ThreadLocal<javax.xml.xpath.XPathFactory> = ThreadLocal.withInitial { XPathFactory.newInstance() }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidTimeUnitConfusion"
+          message="Numeric time-related properties or parameters should use an explicit time unit type."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ituc01">
+        <description>Problem: numeric time-related values such as timeout or ttl are ambiguous without an explicit unit.&#13;
+            Solution: use a type with unit semantics, such as kotlin.time.Duration, or encode the unit clearly in the identifier. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    (pmd-kotlin:typeIs('kotlin.Int') or pmd-kotlin:typeIs('kotlin.Long')
+     or pmd-kotlin:typeIs('java.lang.Integer') or pmd-kotlin:typeIs('java.lang.Long'))
+    and (
+        ends-with(lower-case(VariableDeclaration/@Identifier), 'timetolive')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'time_to_live')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'time')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'timeout')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'time_out')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'duration')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'durationout')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'duration_out')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'ttl')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'timestamp')
+    )
+]
+|
+//FunctionValueParameter[
+    (pmd-kotlin:typeIs('kotlin.Int') or pmd-kotlin:typeIs('kotlin.Long')
+     or pmd-kotlin:typeIs('java.lang.Integer') or pmd-kotlin:typeIs('java.lang.Long'))
+    and (
+        ends-with(lower-case(Parameter/@Identifier), 'timetolive')
+        or ends-with(lower-case(Parameter/@Identifier), 'time_to_live')
+        or ends-with(lower-case(Parameter/@Identifier), 'time')
+        or ends-with(lower-case(Parameter/@Identifier), 'timeout')
+        or ends-with(lower-case(Parameter/@Identifier), 'time_out')
+        or ends-with(lower-case(Parameter/@Identifier), 'duration')
+        or ends-with(lower-case(Parameter/@Identifier), 'durationout')
+        or ends-with(lower-case(Parameter/@Identifier), 'duration_out')
+        or ends-with(lower-case(Parameter/@Identifier), 'ttl')
+        or ends-with(lower-case(Parameter/@Identifier), 'timestamp')
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad {
+    val connectionTimeout: Int = 5000 // bad
+    fun setTtl(ttl: Long) = ttl // bad
+}
+class Good {
+    fun setTimeout(timeout: kotlin.time.Duration) = timeout // good
+}
+        ]]></example>
+    </rule>
 </ruleset>
