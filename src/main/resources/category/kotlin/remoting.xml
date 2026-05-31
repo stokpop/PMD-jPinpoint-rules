@@ -451,4 +451,96 @@ fun connectionProviderGood(): ConnectionProvider {
     ]]>
         </example>
     </rule>
+
+    <rule name="BufferingClientHttpRequestFactoryIsMemoryGreedy"
+          message="BufferingClientHttpRequestFactory buffers entire response bodies in memory and is memory greedy."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi18">
+        <description>Problem: BufferingClientHttpRequestFactory buffers the entire response body in memory, which is memory greedy and can cause OutOfMemoryError for large responses.
+            Solution: Avoid using BufferingClientHttpRequestFactory. If you need to read the response body multiple times, prefer streaming approaches.
+            (jpinpoint-rules)</description>
+        <priority>5</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,memory,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.springframework.http.client.BufferingClientHttpRequestFactory#<init>(*)')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.springframework.http.client.BufferingClientHttpRequestFactory
+import org.springframework.http.client.ClientHttpRequestFactory
+
+class Bad(delegate: ClientHttpRequestFactory) {
+    val factory = BufferingClientHttpRequestFactory(delegate) // bad
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidHttpHostOneArgumentConstructor"
+          message="HttpHost with only hostname uses default port, which may be confusing or incorrect."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi16">
+        <description>Problem: Creating an HttpHost with only a hostname uses a default port (-1), which can lead to confusing behaviour.
+            Solution: Always specify the port and protocol explicitly.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="confusing,jpinpoint-rule,suspicious" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.apache.http.HttpHost#<init>(java.lang.String)')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.apache.http.HttpHost
+
+class Bad {
+    val host = HttpHost("hostname") // bad: no port specified
+}
+
+class Good {
+    val host = HttpHost("hostname", 443, "https") // ok
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidJAXBUtil"
+          message="JAXB utility class recreates JAXBContext for each call, which is expensive."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iuoxar04">
+        <description>Problem: The JAXB utility class (javax.xml.bind.JAXB / jakarta.xml.bind.JAXB) recreates a JAXBContext on each call, which is CPU-intensive due to class scanning.
+            Solution: Create and cache a JAXBContext instance and reuse it.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('javax.xml.bind.JAXB#_(*)')] |
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('jakarta.xml.bind.JAXB#_(*)')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import javax.xml.bind.JAXB
+import javax.xml.transform.Source
+
+class Bad {
+    fun <T> unmarshal(src: Source, clazz: Class<T>): T = JAXB.unmarshal(src, clazz) // bad
+}
+        ]]>
+        </example>
+    </rule>
+
 </ruleset>

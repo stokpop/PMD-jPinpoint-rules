@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: JAXB.unmarshal (javax)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.bind.JAXB
+import javax.xml.transform.Source
+
+class Bad {
+    fun <T> unmarshal(src: Source, clazz: Class<T>): T = JAXB.unmarshal(src, clazz) // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: JAXB.marshal (javax)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.bind.JAXB
+import java.io.StringWriter
+
+class Bad2 {
+    fun marshal(obj: Any, sw: StringWriter) = JAXB.marshal(obj, sw) // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: JAXB API used directly via JAXBContext</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.bind.JAXBContext
+
+class Good {
+    fun <T> unmarshal(src: javax.xml.transform.Source, clazz: Class<T>): T {
+        val ctx = JAXBContext.newInstance(clazz)
+        return ctx.createUnmarshaller().unmarshal(src) as T
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

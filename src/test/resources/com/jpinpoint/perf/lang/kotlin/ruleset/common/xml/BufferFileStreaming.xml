@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: FileInputStream in use block without buffering</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import java.io.FileInputStream
+
+fun bad(name: String): ByteArray =
+    FileInputStream(name).use { it.readBytes() } // bad
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: FileOutputStream in use block without buffering</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import java.io.FileOutputStream
+
+fun bad(name: String, data: ByteArray) =
+    FileOutputStream(name).use { it.write(data) } // bad
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: FileInputStream wrapped in BufferedInputStream</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.io.BufferedInputStream
+import java.io.FileInputStream
+
+fun good(name: String): ByteArray =
+    BufferedInputStream(FileInputStream(name)).use { it.readBytes() }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: FileOutputStream wrapped in BufferedOutputStream</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.io.BufferedOutputStream
+import java.io.FileOutputStream
+
+fun good(name: String, data: ByteArray) =
+    BufferedOutputStream(FileOutputStream(name)).use { it.write(data) }
+        ]]></code>
+    </test-code>
+
+</test-data>

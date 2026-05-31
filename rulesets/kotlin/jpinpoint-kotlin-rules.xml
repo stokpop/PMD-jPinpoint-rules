@@ -62,7 +62,7 @@ class Foo {
 (: requires type info on the declaration or initializer expression :)
 (: also match when declared type is a supertype (e.g. val x: NumberFormat = DecimalFormat(...)) :)
 //PropertyDeclaration[
-    not(ancestor::FunctionBody)
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
     and (
         pmd-kotlin:typeIs('java.text.DecimalFormat') or pmd-kotlin:typeIs('java.text.ChoiceFormat')
         or Expression//PrimaryExpression[
@@ -699,6 +699,46 @@ class FooGood {
         </example>
     </rule>
 
+    <rule name="BufferFileStreaming"
+          message="FileInputStream or FileOutputStream used without buffering. Wrap with BufferedInputStream or BufferedOutputStream."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#isio05">
+        <description>Problem: With FileInputStream and FileOutputStream, file access is not buffered.
+            The stream is read-from/written-to file byte by byte, where each operating system call has its overhead, which makes it slow.
+            Solution: Use buffering to read/write a chunk of bytes at once with much lower overhead.
+            Use BufferedOutput/InputStream which has a buffer size of 8 kB by default to write at once. Make sure to close it after use.
+            (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="cpu,io,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('java.io.FileInputStream#<init>(*)')
+    or pmd-kotlin:matchesSig('java.io.FileOutputStream#<init>(*)'))
+    and not(ancestor::PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('java.io.BufferedInputStream#<init>(*)')
+        or pmd-kotlin:matchesSig('java.io.BufferedOutputStream#<init>(*)')
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.io.BufferedInputStream
+import java.io.FileInputStream
+
+fun bad(name: String): ByteArray =
+    FileInputStream(name).use { it.readBytes() } // bad
+
+fun good(name: String): ByteArray =
+    BufferedInputStream(FileInputStream(name)).use { it.readBytes() } // ok
+        ]]>
+        </example>
+    </rule>
+
     <rule name="LegacyTimeLibraryUsed"
           language="kotlin"
           message="Migrate from the legacy time library to java.time for better performance."
@@ -1010,6 +1050,46 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
         ]]></example>
     </rule>
 
+    <rule name="AvoidMutableStaticFields"
+          message="Avoid mutable static fields. Make val (immutable) or use thread-safe access with @Volatile or @GuardedBy."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#tutc08">
+        <description>Problem: Multiple threads typically access static fields. Unguarded assignment to a mutable or non-final static field is thread-unsafe and may cause corruption or visibility problems. To make this thread-safe, that is, guard the field e.g. with synchronized methods, may cause contention.
+            Solution: Make the fields final and unmodifiable. If they really need to be mutable, make access thread-safe: use synchronized and @GuardedBy, use volatile or a suitable concurrent collection type. Consider lock contention.
+            (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    @Mutable = true()
+    and (pmd-kotlin:isWithin('companion-object') or pmd-kotlin:isWithin('object-declaration'))
+    and not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and not(pmd-kotlin:hasAnnotation('Volatile') or pmd-kotlin:hasAnnotation('GuardedBy'))
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+class Bad {
+    companion object {
+        var count: Int = 0 // bad: mutable static field
+    }
+}
+class Good {
+    companion object {
+        val MAX: Int = 100 // ok: immutable
+        @Volatile
+        var running: Boolean = false // ok: volatile
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
     <rule name="AvoidNonPrivateFieldsInSharedObjects"
           language="kotlin"
           message="Avoid non-private properties in shared objects. Make properties private to ensure thread-safety."
@@ -1049,7 +1129,7 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
 (: Step 2: Find non-private, non-val properties at class level :)
 //PropertyDeclaration[
   (: not inside a function body — class-level property :)
-  not(ancestor::FunctionBody)
+  not(pmd-kotlin:isWithin('function-body'))
   (: not private :)
   and not(pmd-kotlin:modifiers()='private')
   (: not val (final) :)
@@ -1079,6 +1159,91 @@ class RootController {
     lateinit var baskets5: List<Any>           // allowed, injected
 }
         ]]></example>
+    </rule>
+
+    <rule name="AvoidParallelFlux"
+          message="Avoid Flux.parallel for iterable sources: it divides data on CPU-count rails which is usually slower for non-CPU-intensive work."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ia12">
+        <description>Problem: With Reactor Flux.parallel.runOn, the data is divided on a number of 'rails' matching the number of CPU cores.
+            This is only useful in case much CPU processing is performed: if the sequential form takes more than 0,1 ms of CPU time.
+            With remote calls this is usually not the case. In addition, it introduces more complexity with risk of failures.
+            Solution: Remove parallel().runOn. Unless the CPU work takes more than 0,1 ms in sequential form and proves to be faster with parallelization.
+            So only for large collections and much CPU processing.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="bad-practice,cpu,jpinpoint-rule,multi-threading,performance,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('reactor.core.publisher.Flux#parallel(*)')
+    and pmd-kotlin:matchesSig('reactor.core.publisher.Flux#fromIterable(*)')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import reactor.core.publisher.Flux
+import reactor.core.scheduler.Schedulers
+
+class Bad {
+    fun process(items: List<String>): Flux<String> =
+        Flux.fromIterable(items)
+            .parallel() // bad
+            .runOn(Schedulers.parallel())
+            .sequential()
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidStaticXmlFactories"
+          message="XML Factory is used as static/object/companion field. XML factories are not thread-safe. Use local variables instead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#IUOXAR09">
+        <description>An XML Factory like DocumentBuilderFactory, TransformerFactory, MessageFactory is used as static field. Problem: These factory objects are typically not thread-safe and rather expensive to create because of class loading.
+            Solution: Create the Factories as local variables and use command line arguments to specify the implementation class. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    (pmd-kotlin:isWithin('companion-object') or pmd-kotlin:isWithin('object-declaration') or pmd-kotlin:isWithin('top-level'))
+    and not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and (
+        pmd-kotlin:typeIs('javax.xml.parsers.DocumentBuilderFactory')
+        or pmd-kotlin:typeIs('javax.xml.parsers.SAXParserFactory')
+        or pmd-kotlin:typeIs('javax.xml.stream.XMLInputFactory')
+        or pmd-kotlin:typeIs('javax.xml.stream.XMLOutputFactory')
+        or pmd-kotlin:typeIs('javax.xml.stream.XMLEventFactory')
+        or pmd-kotlin:typeIs('javax.xml.transform.TransformerFactory')
+        or pmd-kotlin:typeIs('javax.xml.validation.SchemaFactory')
+        or pmd-kotlin:typeIs('javax.xml.datatype.DatatypeFactory')
+        or pmd-kotlin:typeIs('javax.xml.soap.MessageFactory')
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import javax.xml.parsers.DocumentBuilderFactory
+
+class Bad {
+    companion object {
+        val dbFactory: DocumentBuilderFactory = DocumentBuilderFactory.newInstance() // bad
+    }
+    fun parse(xml: String) {
+        val localFactory = DocumentBuilderFactory.newInstance() // ok: local variable
+    }
+}
+        ]]>
+        </example>
     </rule>
 
     <rule name="AvoidUnguardedAssignmentToNonFinalFieldsInObjectsUsingSynchronized"
@@ -1117,7 +1282,7 @@ class RootController {
   (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
       @Mutable = true()
-      and not(ancestor::FunctionBody)
+      and not(pmd-kotlin:isWithin('function-body'))
       (: not @Volatile :)
       and not(pmd-kotlin:hasAnnotation('Volatile'))
       (: not @GuardedBy :)
@@ -1229,7 +1394,7 @@ class Good {
       (: Case A: direct assignment like "mutableField = value" or "this.mutableField = value" :)
       @Text = ancestor::ClassBody[1]//PropertyDeclaration[
         @Mutable = true()
-        and not(ancestor::FunctionBody)
+        and not(pmd-kotlin:isWithin('function-body'))
         (: not @Volatile :)
         and not(pmd-kotlin:hasAnnotation('Volatile'))
         (: not @GuardedBy :)
@@ -1257,7 +1422,7 @@ class Good {
       (: not in an init block (constructor-like) :)
       and not(ancestor::ClassBody/AnonymousInitializer)
       (: the name is NOT a known var field of THIS class :)
-      and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
+      and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier)
       (: and not a local var :)
       and not(@Text = ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration/@Identifier)
       (: and not a function parameter :)
@@ -1340,7 +1505,7 @@ class MyService {
 ]
 (: Step 2: Find var fields that are not guarded :)
 //PropertyDeclaration[
-  not(ancestor::FunctionBody)
+  not(pmd-kotlin:isWithin('function-body'))
   and not(ancestor::ClassDeclaration[ancestor::ClassBody])
   and (
     (: Case 1: var field that is not volatile and not guarded :)
@@ -1478,7 +1643,7 @@ class Good {
 ]
 (: Step 2: Find var fields that are not guarded :)
 //PropertyDeclaration[
-  not(ancestor::FunctionBody)
+  not(pmd-kotlin:isWithin('function-body'))
   and not(ancestor::ClassDeclaration[ancestor::ClassBody])
   and (
     (: Case 1: var field that is not volatile and not guarded :)
@@ -1625,7 +1790,7 @@ class BadMutableTypes {
   (: the receiver is a simple identifier :)
   and PrimaryExpression/SimpleIdentifier/T-Identifier[
     (: not a field declared in this class :)
-    not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
+    not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier)
     (: not a function parameter :)
     and not(@Text = ancestor::FunctionDeclaration[1]//FunctionValueParameter/Parameter/@Identifier)
     (: not a local variable :)
@@ -1709,10 +1874,10 @@ class Good : SomeParent() {
   (: assignment target matches a @GuardedBy(fieldName) field where fieldName IS a property :)
   (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
-      not(ancestor::FunctionBody)
+      not(pmd-kotlin:isWithin('function-body'))
       and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[
         not(@Text = 'this')
-        and @Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier
+        and @Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier
       ]
     ]/VariableDeclaration/@Identifier
   ]
@@ -1723,7 +1888,7 @@ class Good : SomeParent() {
         PrimaryExpression//T-Identifier[@Text='synchronized']
         and .//CallSuffix/ValueArguments//T-Identifier/@Text =
           ancestor::ClassBody[1]//PropertyDeclaration[
-            not(ancestor::FunctionBody)
+            not(pmd-kotlin:isWithin('function-body'))
             and .//Annotation[.//T-Identifier[@Text='GuardedBy']]
           ]//T-LineStrText/@Text
       ]
@@ -1745,10 +1910,10 @@ class Good : SomeParent() {
   ancestor::FunctionBody
   and SimpleIdentifier/T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
-      not(ancestor::FunctionBody)
+      not(pmd-kotlin:isWithin('function-body'))
       and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[
         not(@Text = 'this')
-        and @Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier
+        and @Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier
       ]
     ]/VariableDeclaration/@Identifier
   ]
@@ -1759,7 +1924,7 @@ class Good : SomeParent() {
         PrimaryExpression//T-Identifier[@Text='synchronized']
         and .//CallSuffix/ValueArguments//T-Identifier/@Text =
           ancestor::ClassBody[1]//PropertyDeclaration[
-            not(ancestor::FunctionBody)
+            not(pmd-kotlin:isWithin('function-body'))
             and .//Annotation[.//T-Identifier[@Text='GuardedBy']]
           ]//T-LineStrText/@Text
       ]
@@ -1780,10 +1945,10 @@ class Good : SomeParent() {
 ]//Assignment[
   (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
-      not(ancestor::FunctionBody)
+      not(pmd-kotlin:isWithin('function-body'))
       and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[
         not(@Text = 'this')
-        and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
+        and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier)
       ]
     ]/VariableDeclaration/@Identifier
   ]
@@ -1803,10 +1968,10 @@ class Good : SomeParent() {
   ancestor::FunctionBody
   and SimpleIdentifier/T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
-      not(ancestor::FunctionBody)
+      not(pmd-kotlin:isWithin('function-body'))
       and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[
         not(@Text = 'this')
-        and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
+        and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier)
       ]
     ]/VariableDeclaration/@Identifier
   ]
@@ -1879,7 +2044,7 @@ class Good {
   (: assignment target matches a @GuardedBy("this") field :)
   (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
-      not(ancestor::FunctionBody)
+      not(pmd-kotlin:isWithin('function-body'))
       and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[@Text='this']
     ]/VariableDeclaration/@Identifier
   ]
@@ -1910,7 +2075,7 @@ class Good {
   ancestor::FunctionBody
   and SimpleIdentifier/T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
-      not(ancestor::FunctionBody)
+      not(pmd-kotlin:isWithin('function-body'))
       and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[@Text='this']
     ]/VariableDeclaration/@Identifier
   ]
@@ -1966,22 +2131,22 @@ class Good {
 (: Kotlin: WrongUseOfGuardedBy :)
 
 (: Check 1: @GuardedBy argument is not a String literal :)
-//PropertyDeclaration[not(ancestor::FunctionBody)]
+//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]
   //Annotation[.//T-Identifier[@Text='GuardedBy']]
     [.//ValueArguments/ValueArgument[not(.//LineStringLiteral)]]
 
 |
 (: Check 2: @GuardedBy value refers to non-existent field, not "this" :)
-//PropertyDeclaration[not(ancestor::FunctionBody)]
+//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]
   //Annotation[.//T-Identifier[@Text='GuardedBy']]
     //T-LineStrText[
       not(@Text = 'this')
-      and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
+      and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier)
     ]
 
 |
 (: Check 3: @GuardedBy("this") but no @Synchronized method and no synchronized(this) call in class :)
-//PropertyDeclaration[not(ancestor::FunctionBody)]
+//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]
   //Annotation[.//T-Identifier[@Text='GuardedBy']]
     //T-LineStrText[@Text = 'this'
       and not(ancestor::ClassBody[1]//FunctionDeclaration[
@@ -1996,10 +2161,10 @@ class Good {
 |
 (: Check 4: Lock field used in @GuardedBy is not private val :)
 //PropertyDeclaration[
-  not(ancestor::FunctionBody)
+  not(pmd-kotlin:isWithin('function-body'))
   (: this property is referenced by a @GuardedBy annotation :)
   and VariableDeclaration/@Identifier =
-    ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]
+    ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]
       //Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText/@Text
   (: but it is not private val :)
   and (@Mutable = true() or not(pmd-kotlin:modifiers() = 'private'))
@@ -2051,6 +2216,68 @@ class RightUseOfGuardedBy {
         </example>
     </rule>
 
+    <rule name="AvoidHttpHostOneArgumentConstructor"
+          message="HttpHost with only hostname uses default port, which may be confusing or incorrect."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi16">
+        <description>Problem: Creating an HttpHost with only a hostname uses a default port (-1), which can lead to confusing behaviour.
+            Solution: Always specify the port and protocol explicitly.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="confusing,jpinpoint-rule,suspicious" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.apache.http.HttpHost#<init>(java.lang.String)')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.apache.http.HttpHost
+
+class Bad {
+    val host = HttpHost("hostname") // bad: no port specified
+}
+
+class Good {
+    val host = HttpHost("hostname", 443, "https") // ok
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidJAXBUtil"
+          message="JAXB utility class recreates JAXBContext for each call, which is expensive."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#iuoxar04">
+        <description>Problem: The JAXB utility class (javax.xml.bind.JAXB / jakarta.xml.bind.JAXB) recreates a JAXBContext on each call, which is CPU-intensive due to class scanning.
+            Solution: Create and cache a JAXBContext instance and reuse it.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('javax.xml.bind.JAXB#_(*)')] |
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('jakarta.xml.bind.JAXB#_(*)')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import javax.xml.bind.JAXB
+import javax.xml.transform.Source
+
+class Bad {
+    fun <T> unmarshal(src: Source, clazz: Class<T>): T = JAXB.unmarshal(src, clazz) // bad
+}
+        ]]>
+        </example>
+    </rule>
+
     <rule name="AvoidObjectMapperAsField"
           language="kotlin"
           message="Avoid ObjectMapper as field, use ObjectReader or ObjectWriter instead."
@@ -2069,7 +2296,7 @@ class RightUseOfGuardedBy {
                 <value><![CDATA[
 (: requires type info: kotlin-type-mapper auxClasspath :)
 //PropertyDeclaration[
-    not(ancestor::FunctionBody)
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
     and (
         pmd-kotlin:typeIs('com.fasterxml.jackson.databind.ObjectMapper')
         or Expression//PrimaryExpression[
@@ -2111,7 +2338,7 @@ class Foo {
 |
 (: property/field with XMLGregorianCalendar declared type (name-based: distinctive class name) :)
 //PropertyDeclaration[
-    not(ancestor::FunctionBody)
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
     and .//T-Identifier[@Text='XMLGregorianCalendar']
 ]
 |
@@ -2129,6 +2356,35 @@ class Foo {
     fun good(dt: LocalDateTime): String = dt.toString() // good
 }
         ]]></example>
+    </rule>
+
+    <rule name="BufferingClientHttpRequestFactoryIsMemoryGreedy"
+          message="BufferingClientHttpRequestFactory buffers entire response bodies in memory and is memory greedy."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi18">
+        <description>Problem: BufferingClientHttpRequestFactory buffers the entire response body in memory, which is memory greedy and can cause OutOfMemoryError for large responses.
+            Solution: Avoid using BufferingClientHttpRequestFactory. If you need to read the response body multiple times, prefer streaming approaches.
+            (jpinpoint-rules)</description>
+        <priority>5</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,memory,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.springframework.http.client.BufferingClientHttpRequestFactory#<init>(*)')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.springframework.http.client.BufferingClientHttpRequestFactory
+import org.springframework.http.client.ClientHttpRequestFactory
+
+class Bad(delegate: ClientHttpRequestFactory) {
+    val factory = BufferingClientHttpRequestFactory(delegate) // bad
+}
+        ]]>
+        </example>
     </rule>
 
     <rule name="GsonCreatedForEachMethodCall"

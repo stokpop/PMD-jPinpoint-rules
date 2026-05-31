@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: mutable var in companion object without annotation</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class Bad {
+    companion object {
+        var count: Int = 0 // bad: mutable static field, not thread-safe
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: mutable var in object declaration</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+object Counter {
+    var count: Int = 0 // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: val in companion object (immutable)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Good {
+    companion object {
+        val MAX: Int = 100 // ok: immutable
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: mutable var in companion object annotated with @Volatile</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodVolatile {
+    companion object {
+        @Volatile
+        var running: Boolean = false // ok: volatile
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: mutable local var in function (not static)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodLocal {
+    fun doWork() {
+        var count = 0 // ok: local variable
+        count++
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

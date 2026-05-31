@@ -838,4 +838,45 @@ import java.util.List // good - java.util is always available
         </example>
     </rule>
 
+
+    <rule name="BufferFileStreaming"
+          message="FileInputStream or FileOutputStream used without buffering. Wrap with BufferedInputStream or BufferedOutputStream."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isio05">
+        <description>Problem: With FileInputStream and FileOutputStream, file access is not buffered.
+            The stream is read-from/written-to file byte by byte, where each operating system call has its overhead, which makes it slow.
+            Solution: Use buffering to read/write a chunk of bytes at once with much lower overhead.
+            Use BufferedOutput/InputStream which has a buffer size of 8 kB by default to write at once. Make sure to close it after use.
+            (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="cpu,io,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('java.io.FileInputStream#<init>(*)')
+    or pmd-kotlin:matchesSig('java.io.FileOutputStream#<init>(*)'))
+    and not(ancestor::PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('java.io.BufferedInputStream#<init>(*)')
+        or pmd-kotlin:matchesSig('java.io.BufferedOutputStream#<init>(*)')
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.io.BufferedInputStream
+import java.io.FileInputStream
+
+fun bad(name: String): ByteArray =
+    FileInputStream(name).use { it.readBytes() } // bad
+
+fun good(name: String): ByteArray =
+    BufferedInputStream(FileInputStream(name)).use { it.readBytes() } // ok
+        ]]>
+        </example>
+    </rule>
+
 </ruleset>

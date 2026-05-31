@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: Flux.fromIterable then parallel</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import reactor.core.publisher.Flux
+import reactor.core.scheduler.Schedulers
+
+class Bad {
+    fun process(items: List<String>): Flux<String> =
+        Flux.fromIterable(items)
+            .parallel() // bad: parallel on iterable flux
+            .runOn(Schedulers.parallel())
+            .sequential()
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: Flux.fromIterable without parallel</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import reactor.core.publisher.Flux
+
+class Good {
+    fun process(items: List<String>): Flux<String> =
+        Flux.fromIterable(items).map { it.uppercase() }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: parallel on non-iterable flux</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import reactor.core.publisher.Flux
+import reactor.core.scheduler.Schedulers
+
+class GoodParallel {
+    fun process(flux: Flux<String>): Flux<String> =
+        flux.parallel()
+            .runOn(Schedulers.parallel())
+            .sequential()
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
