@@ -706,4 +706,77 @@ class Service(registry: RetryRegistry) {
         </example>
     </rule>
 
+    <rule name="RetryCanCauseOverload"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Be careful with retrying: multiple retry locations in a call chain can cause overload."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi13">
+        <description>Problem: Multiple Retry locations in a call chain multiply the number of calls and may cause overload during recovery.
+            Solution: Have the retry mechanism in one location in the chain only, recommended closest to the user. (jpinpoint-rules)</description>
+        <priority>5</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,resilience,suspicious,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//Annotation[.//T-Identifier[@Text='Retry' or @Text='Retryable']]
+,
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and .//T-Identifier[@Text='Retry']
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import io.github.resilience4j.retry.annotation.Retry
+
+class RetryService {
+    @Retry(name = "remote-service") // inform
+    fun callRemote() {
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidModifyingObjectMapper"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="ObjectMapper is configured/modified, only initialize it right after construction."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iuojar02">
+        <description>Problem: ObjectMapper is thread-safe only after configuration; modifying it later is not thread-safe.
+            Solution: Configure it during initialization only, then reuse it immutably. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PostfixUnarySuffix/NavigationSuffix[
+        matches(@Identifier, '^(configure|set|register|find|disable|enable|activateDefaultTyping|deactivateDefaultTyping|add|clear).*')
+    ]
+    and PostfixUnarySuffix/CallSuffix
+    and pmd-kotlin:isWithin('function-body')
+    and not(ancestor::AnonymousInitializer)
+    and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+        ancestor::ClassBody[1]//PropertyDeclaration[
+            not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+            and pmd-kotlin:typeIs('com.fasterxml.jackson.databind.ObjectMapper')
+        ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class MapperService {
+    private val mapper = ObjectMapper()
+
+    fun bad() {
+        mapper.registerModule(JavaTimeModule()) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
 </ruleset>

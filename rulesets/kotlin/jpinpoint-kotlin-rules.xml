@@ -1048,6 +1048,58 @@ class GoodKotlinMdc {
         ]]></example>
     </rule>
 
+    <rule name="UnconditionalConcatInLogArgument"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="String concatenation (+) is executed regardless of log level and can be expensive"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#il01">
+        <description>Problem: String concatenation and string interpolation are executed regardless of log level and can be expensive.
+            Solution: Use SLF4J formatting with {} placeholders or guard the log statement conditionally. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PostfixUnarySuffix/NavigationSuffix/@Identifier = ('trace', 'debug', 'info')
+    and PostfixUnarySuffix/CallSuffix
+    and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) = 1
+    and (
+        pmd-kotlin:matchesSig('org.slf4j.Logger#trace(*)')
+        or pmd-kotlin:matchesSig('org.slf4j.Logger#debug(*)')
+        or pmd-kotlin:matchesSig('org.slf4j.Logger#info(*)')
+        or PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = 'log'
+    )
+    and (
+        PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef
+        or PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//AdditiveExpression
+    )
+    and not(
+        ancestor::IfExpression[
+            .//PostfixUnaryExpression[
+                PostfixUnarySuffix/NavigationSuffix/@Identifier = ('isTraceEnabled', 'isDebugEnabled', 'isInfoEnabled')
+            ]
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad(userId: String) {
+        log.debug("Getting user $userId") // bad
+    }
+
+    fun good(userId: String) {
+        log.debug("Getting user {}", userId) // good
+    }
+}
+        ]]></example>
+    </rule>
+
     <rule name="UnresolvedType"
           language="kotlin"
           message="A type cannot be resolved. Make sure all dependencies are available on the classpath."
@@ -1193,6 +1245,46 @@ fun collectGood(completionService: CompletionService<List<Any>>): Future<List<An
         ]]></example>
     </rule>
 
+    <rule name="AvoidExecutorInvokeWithoutTimeout"
+          language="kotlin"
+          message="Avoid using ExecutorService::invokeAll or invokeAny without a timeout."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ia15">
+        <description>Problem: Stalls indefinitely in case of stalled Callable(s) and consumes threads.
+            Solution: Provide a timeout to the invokeAll/invokeAny method and handle the timeout. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) = 1
+    and (
+        pmd-kotlin:matchesSig('java.util.concurrent.ExecutorService#invokeAll(*)')
+        or pmd-kotlin:matchesSig('java.util.concurrent.ExecutorService#invokeAny(*)')
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+
+class TaskRunner {
+    fun invokeAllBad(executor: ExecutorService, callables: Collection<Callable<String>>): List<Future<String>> {
+        return executor.invokeAll(callables) // bad
+    }
+
+    fun invokeAllGood(executor: ExecutorService, callables: Collection<Callable<String>>): List<Future<String>> {
+        return executor.invokeAll(callables, 30, TimeUnit.SECONDS) // good
+    }
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidFutureGetWithoutTimeout"
           language="kotlin"
           message="Avoid future.get without timeout"
@@ -1271,6 +1363,48 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
     return futures
         .filter { it.isDone && !it.isCompletedExceptionally }
         .map { it.join() } // good - timeout provided above
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidIncrementOrDecrementForVolatileField"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid ++, --, +=, -= for volatile fields"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#tutc09">
+        <description>Problem: Compound operations on volatile fields are not atomic.
+            Solution: Use AtomicInteger or another atomic type, or guard the updates. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PostfixUnarySuffix[PostfixUnaryOperator]
+    and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+        ancestor::ClassBody[1]//PropertyDeclaration[
+            pmd-kotlin:hasAnnotation('Volatile')
+        ]/VariableDeclaration/@Identifier
+]
+,
+//Assignment[
+    AssignmentAndOperator
+    and (DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text =
+        ancestor::ClassBody[1]//PropertyDeclaration[
+            pmd-kotlin:hasAnnotation('Volatile')
+        ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Counter {
+    @Volatile
+    private var counter = 0
+
+    fun bad() {
+        counter++ // bad
+    }
 }
         ]]></example>
     </rule>
@@ -1504,6 +1638,42 @@ class Bad {
 }
         ]]>
         </example>
+    </rule>
+
+    <rule name="AvoidParallelStreamWithCommonPool"
+          language="kotlin"
+          message="Beware: parallelStream with the common pool is rarely a good choice."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ia11">
+        <description>Problem: Collection.parallelStream uses the common pool, with #threads = #CPUs. It is designed to distribute much CPU work over the cores. It is not designed for remote calls or other blocking calls.
+            In addition, parallelizing has CPU overhead and concurrency risks.
+            Solution: Prefer sequential streams or Kotlin sequences, or use a dedicated pool when parallelism is justified. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,multi-threading,performance,sustainability-medium,unpredictable" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) = 0
+    and (
+        pmd-kotlin:matchesSig('java.util.Collection#parallelStream(*)')
+        or pmd-kotlin:matchesSig('java.util.stream.BaseStream#parallel(*)')
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class StreamService {
+    fun bad(list: List<String>) {
+        list.parallelStream().forEach { println(it) } // bad
+    }
+
+    fun good(list: List<String>) {
+        list.asSequence().forEach { println(it) } // good
+    }
+}
+        ]]></example>
     </rule>
 
     <rule name="AvoidReactorOnEachOperator"
@@ -2492,6 +2662,55 @@ class Good {
         ]]></example>
     </rule>
 
+    <rule name="SynchronizingForLocalVars"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Local variables don't need synchronization"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#tutc12">
+        <description>Problem: Synchronizing a block that only accesses local variables adds locking overhead without protecting shared state.
+            Solution: Only synchronize when the block accesses shared mutable state. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='synchronized']
+    and PostfixUnarySuffix/CallSuffix
+    and pmd-kotlin:isWithin('function-body')
+    and not(
+        PostfixUnarySuffix/CallSuffix//LambdaLiteral//PostfixUnaryExpression[
+            PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+                ancestor::ClassBody[1]//PropertyDeclaration[
+                    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+                ]/VariableDeclaration/@Identifier
+        ]
+    )
+    and not(
+        PostfixUnarySuffix/CallSuffix//LambdaLiteral//Assignment[
+            (DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text =
+                ancestor::ClassBody[1]//PropertyDeclaration[
+                    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+                ]/VariableDeclaration/@Identifier
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class SyncService {
+    fun bad(): String {
+        var localVar = "start"
+        synchronized(this) {
+            localVar = "updated" // bad
+        }
+        return localVar
+    }
+}
+        ]]></example>
+    </rule>
+
     <rule name="WrongUseOfGuardedBy"
           language="kotlin"
           message="@GuardedBy or locking is used in a wrong way, this may indicate a concurrency bug."
@@ -2699,6 +2918,47 @@ class Service(registry: RetryRegistry) {
 }
         ]]>
         </example>
+    </rule>
+
+    <rule name="AvoidModifyingObjectMapper"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="ObjectMapper is configured/modified, only initialize it right after construction."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#iuojar02">
+        <description>Problem: ObjectMapper is thread-safe only after configuration; modifying it later is not thread-safe.
+            Solution: Configure it during initialization only, then reuse it immutably. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PostfixUnarySuffix/NavigationSuffix[
+        matches(@Identifier, '^(configure|set|register|find|disable|enable|activateDefaultTyping|deactivateDefaultTyping|add|clear).*')
+    ]
+    and PostfixUnarySuffix/CallSuffix
+    and pmd-kotlin:isWithin('function-body')
+    and not(ancestor::AnonymousInitializer)
+    and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+        ancestor::ClassBody[1]//PropertyDeclaration[
+            not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+            and pmd-kotlin:typeIs('com.fasterxml.jackson.databind.ObjectMapper')
+        ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class MapperService {
+    private val mapper = ObjectMapper()
+
+    fun bad() {
+        mapper.registerModule(JavaTimeModule()) // bad
+    }
+}
+        ]]></example>
     </rule>
 
     <rule name="AvoidObjectMapperAsField"
@@ -3271,6 +3531,38 @@ class Foo {
     }
     fun toJson(obj: Any): String {
         return ObjectMapper().writeValueAsString(obj) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="RetryCanCauseOverload"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Be careful with retrying: multiple retry locations in a call chain can cause overload."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi13">
+        <description>Problem: Multiple Retry locations in a call chain multiply the number of calls and may cause overload during recovery.
+            Solution: Have the retry mechanism in one location in the chain only, recommended closest to the user. (jpinpoint-rules)</description>
+        <priority>5</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,resilience,suspicious,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//Annotation[.//T-Identifier[@Text='Retry' or @Text='Retryable']]
+,
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and .//T-Identifier[@Text='Retry']
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import io.github.resilience4j.retry.annotation.Retry
+
+class RetryService {
+    @Retry(name = "remote-service") // inform
+    fun callRemote() {
     }
 }
         ]]></example>

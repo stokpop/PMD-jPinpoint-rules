@@ -1064,4 +1064,56 @@ class Good {
         </example>
     </rule>
 
+    <rule name="UnconditionalConcatInLogArgument"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="String concatenation (+) is executed regardless of log level and can be expensive"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#il01">
+        <description>Problem: String concatenation and string interpolation are executed regardless of log level and can be expensive.
+            Solution: Use SLF4J formatting with {} placeholders or guard the log statement conditionally. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PostfixUnarySuffix/NavigationSuffix/@Identifier = ('trace', 'debug', 'info')
+    and PostfixUnarySuffix/CallSuffix
+    and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) = 1
+    and (
+        pmd-kotlin:matchesSig('org.slf4j.Logger#trace(*)')
+        or pmd-kotlin:matchesSig('org.slf4j.Logger#debug(*)')
+        or pmd-kotlin:matchesSig('org.slf4j.Logger#info(*)')
+        or PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = 'log'
+    )
+    and (
+        PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef
+        or PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//AdditiveExpression
+    )
+    and not(
+        ancestor::IfExpression[
+            .//PostfixUnaryExpression[
+                PostfixUnarySuffix/NavigationSuffix/@Identifier = ('isTraceEnabled', 'isDebugEnabled', 'isInfoEnabled')
+            ]
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad(userId: String) {
+        log.debug("Getting user $userId") // bad
+    }
+
+    fun good(userId: String) {
+        log.debug("Getting user {}", userId) // good
+    }
+}
+        ]]></example>
+    </rule>
+
 </ruleset>

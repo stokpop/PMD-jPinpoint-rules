@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: resilience4j retry annotation</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import io.github.resilience4j.retry.annotation.Retry
+
+class RetryService {
+    @Retry(name = "remote-service")
+    fun callRemote() {
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: class-level Retry field</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import io.github.resilience4j.retry.Retry
+
+class RetryHolder {
+    private lateinit var retry: Retry
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: spring retryable annotation</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.retry.annotation.Retryable
+
+class SpringRetryService {
+    @Retryable
+    fun callRemote() {
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: local Retry variable inside function</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import io.github.resilience4j.retry.Retry
+
+class LocalRetryService {
+    fun buildRetry(retry: Retry): Retry {
+        val localRetry = retry
+        return localRetry
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

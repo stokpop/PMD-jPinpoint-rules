@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: synchronized only updates local var</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+class SyncService {
+    fun bad(): String {
+        var localVar = "start"
+
+        synchronized(this) {
+            localVar = "updated"
+        }
+        return localVar
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: synchronized only uses local map copy</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+class SyncService {
+    private val lock = Any()
+
+    fun bad(localMap: MutableMap<String, String>) {
+        synchronized(lock) {
+            val copy = localMap
+            copy.clear()
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: synchronized updates shared field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class SyncService {
+    private var sharedField = ""
+
+    fun good(newValue: String) {
+        synchronized(this) {
+            sharedField = newValue
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: synchronized uses shared list</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class SyncService {
+    private val lock = Any()
+    private val sharedList = mutableListOf<String>()
+
+    fun good(item: String) {
+        synchronized(lock) {
+            sharedList.add(item)
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: parallelStream on collection</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class StreamService {
+    fun bad(list: List<String>) {
+        list.parallelStream().forEach { println(it) }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: parallel on stream</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class ParallelService {
+    fun bad(list: List<String>) {
+        list.stream().parallel().forEach { println(it) }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: sequential stream</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class SequentialService {
+    fun good(list: List<String>) {
+        list.stream().sequential().forEach { println(it) }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: Kotlin sequence</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class SequenceService {
+    fun good(list: List<String>) {
+        list.asSequence().forEach { println(it) }
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: debug string interpolation</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad(userId: String) {
+        log.debug("Getting user $userId")
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: info string concatenation</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>9</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class User(private val name: String) {
+    fun getName(): String = name
+}
+
+class LoggingService(private val log: Logger) {
+    fun bad(user: User) {
+        log.info("User: " + user.getName())
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: trace interpolation</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad(items: List<String>, timeout: Long) {
+        log.trace("Processing ${items.size} items with ${timeout}ms")
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: parameterized logging</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun good(userId: String) {
+        log.debug("Getting user {}", userId)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: debug guarded by log level</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun good(result: String) {
+        if (log.isDebugEnabled) {
+            log.debug("Slow: $result")
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: warn logging not targeted</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun good(ex: RuntimeException) {
+        log.warn("Error occurred: ${ex.message}")
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
