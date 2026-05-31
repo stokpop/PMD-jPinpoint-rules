@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: BouncyCastleProvider constructed in function body</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.security.Security
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+
+fun encrypt(data: ByteArray): ByteArray {
+    Security.addProvider(BouncyCastleProvider()) // bad: expensive, recreated per call
+    return data
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: BouncyCastleProvider in lambda</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.security.Security
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+
+fun encryptAll(items: List<ByteArray>) = items.map { data ->
+    Security.addProvider(BouncyCastleProvider()) // bad: recreated per element
+    data
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: BouncyCastleProvider registered in companion object</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.security.Security
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+
+class CryptoService {
+    companion object {
+        init {
+            Security.addProvider(BouncyCastleProvider()) // ok: registered once
+        }
+    }
+    fun encrypt(data: ByteArray) = data
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: BouncyCastleProvider registered as top-level val (lazy)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.security.Security
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+
+private val PROVIDER by lazy { BouncyCastleProvider().also { Security.addProvider(it) } } // ok: lazy singleton
+        ]]></code>
+    </test-code>
+
+</test-data>

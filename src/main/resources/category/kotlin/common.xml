@@ -994,4 +994,74 @@ fun good(code: String) = Status.values().firstOrNull { it.code == code } // ok: 
         </example>
     </rule>
 
+    <rule name="AvoidCalendarDateCreation"
+          message="A Calendar is used to get a Date or millis; this is expensive. Use LocalDate.now(), Instant.now() or System.currentTimeMillis()."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ue01">
+        <description>Problem: Calendar.getInstance() is expensive as it scans locale and timezone configuration.
+            Using it just to get the current time or a Date object wastes CPU.
+            Solution: Use java.time.LocalDate.now(), java.time.Instant.now() or System.currentTimeMillis() for timestamps.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('java.util.Calendar#getInstance(*)')
+     or pmd-kotlin:matchesSig('java.util.GregorianCalendar#getInstance(*)'))
+    and (pmd-kotlin:matchesSig('java.util.Calendar#getTime(*)')
+         or pmd-kotlin:matchesSig('java.util.Calendar#getTimeInMillis(*)'))
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.util.Calendar
+fun bad() = Calendar.getInstance().getTime()    // bad: expensive
+fun good() = java.time.Instant.now()            // ok: idiomatic Kotlin/Java
+fun goodMs() = System.currentTimeMillis()       // ok
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidRecreatingSecurityProviders"
+          message="Avoid re-creating security providers in methods; register them once (e.g. in a companion object init block)."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ue04">
+        <description>Problem: Creating security providers (e.g. BouncyCastleProvider) is expensive and should be done once.
+            Re-creating them in methods or lambdas wastes CPU and may cause duplicate registration warnings.
+            Solution: Register the provider once in a companion object init block or a top-level property.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.bouncycastle.jce.provider.BouncyCastleProvider#<init>(*)')
+    and (pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and not(ancestor::PropertyDelegate)
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.security.Security
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+fun bad(data: ByteArray): ByteArray {
+    Security.addProvider(BouncyCastleProvider()) // bad: expensive per call
+    return data
+}
+class Good {
+    companion object { init { Security.addProvider(BouncyCastleProvider()) } } // ok: once
+}
+        ]]>
+        </example>
+    </rule>
+
 </ruleset>

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: if containsKey then put on ConcurrentHashMap parameter</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import java.util.concurrent.ConcurrentHashMap
+
+fun bad(map: ConcurrentHashMap<String, String>, key: String, value: String) {
+    if (!map.containsKey(key)) { // bad: non-atomic check-then-act
+        map.put(key, value)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: if containsKey then put on ConcurrentHashMap class field</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import java.util.concurrent.ConcurrentHashMap
+
+class Cache {
+    private val store = ConcurrentHashMap<String, String>()
+
+    fun put(key: String, value: String) {
+        if (!store.containsKey(key)) { // bad: race condition between check and put
+            store.put(key, value)
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: putIfAbsent (atomic)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.concurrent.ConcurrentHashMap
+
+fun good(map: ConcurrentHashMap<String, String>, key: String, value: String) {
+    map.putIfAbsent(key, value) // ok: atomic operation
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: computeIfAbsent (atomic, idiomatic Kotlin)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.concurrent.ConcurrentHashMap
+
+class Cache {
+    private val store = ConcurrentHashMap<String, List<String>>()
+    fun getOrCreate(key: String) = store.computeIfAbsent(key) { emptyList() } // ok: atomic
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: containsKey on regular HashMap (not concurrent)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+fun good(map: HashMap<String, String>, key: String, value: String) {
+    if (!map.containsKey(key)) {
+        map.put(key, value) // ok: regular (non-concurrent) map
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

@@ -1348,4 +1348,154 @@ class Good {
         </example>
     </rule>
 
+    <rule name="AvoidReactorOnEachOperator"
+          message="Avoid using Reactor Hooks.onEachOperator; it instruments every operator and has significant overhead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi14">
+        <description>Problem: Hooks.onEachOperator adds instrumentation to every single Reactor operator, causing significant CPU overhead.
+            Solution: Use Hooks.onOperatorDebug() only during debugging, or use Micrometer Context Propagation for MDC propagation instead.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('reactor.core.publisher.Hooks#onEachOperator(*)')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import reactor.core.publisher.Hooks
+class AppConfig {
+    init {
+        Hooks.onEachOperator("key", operator) // bad: instruments every Reactor operator
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidMDCInReactor"
+          message="Avoid using MDC in a Reactor pipeline; MDC is thread-local and does not propagate across Reactor scheduler threads."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi14">
+        <description>Problem: MDC (Mapped Diagnostic Context) is stored in ThreadLocal, which is not propagated by Reactor's scheduler thread switches.
+            Solution: Use Reactor's Context API or Micrometer Context Propagation for tracing context in reactive pipelines.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.slf4j.MDC#setContextMap(*)')
+    and (
+        ancestor::FunctionDeclaration[
+            pmd-kotlin:typeIs('reactor.core.publisher.Flux')
+            or pmd-kotlin:typeIs('reactor.core.publisher.Mono')
+        ]
+        or ancestor::FunctionDeclaration/FunctionValueParameters//FunctionValueParameter[
+            pmd-kotlin:typeIs('reactor.util.context.Context')
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.slf4j.MDC
+import reactor.core.publisher.Flux
+class Service {
+    fun process(items: List<String>): Flux<String> {
+        MDC.setContextMap(mapOf("traceId" to "x")) // bad: MDC not propagated across Reactor schedulers
+        return Flux.fromIterable(items)
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidNonAtomicIfModifyOnConcurrentMap"
+          message="Non-atomic if-modify used on a ConcurrentMap; use putIfAbsent, computeIfAbsent, or compute instead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#cac09">
+        <description>Problem: A check-then-act on a ConcurrentMap (e.g. containsKey followed by put) is a race condition.
+            Between the check and the put, another thread may have already inserted the key.
+            Solution: Use atomic operations: putIfAbsent, computeIfAbsent, or compute.
+            In Kotlin, getOrPut is also available for kotlin.collections.MutableMap.
+            (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//IfExpression[
+    .//PostfixUnaryExpression[pmd-kotlin:matchesSig('java.util.concurrent.ConcurrentMap#containsKey(*)')]
+    and ControlStructureBody//PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('java.util.concurrent.ConcurrentMap#put(*)')
+        or pmd-kotlin:matchesSig('java.util.Map#put(*)')
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.util.concurrent.ConcurrentHashMap
+class Cache {
+    private val store = ConcurrentHashMap<String, String>()
+    fun bad(key: String, value: String) {
+        if (!store.containsKey(key)) store.put(key, value) // bad: race condition
+    }
+    fun good(key: String, value: String) = store.putIfAbsent(key, value) // ok: atomic
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidCommonPoolForBlockingCalls"
+          message="Avoid parallelStream() for blocking (remote) calls; it uses the ForkJoinPool common pool which can starve other tasks."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#cac10">
+        <description>Problem: parallelStream() uses the ForkJoinPool common pool (shared JVM-wide). Blocking calls (HTTP, DB) starve it.
+            Solution: Use a dedicated ForkJoinPool (submit your parallel work to it), or use Kotlin coroutines with IO dispatcher.
+            (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//KotlinFile[
+    ImportList/ImportHeader[
+        starts-with(@Name, 'org.springframework.web.client')
+        or starts-with(@Name, 'org.apache.commons.httpclient')
+        or starts-with(@Name, 'org.apache.http')
+    ]
+]//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.Collection#parallelStream()')
+    and not(ancestor::LambdaLiteral[
+        ancestor::PostfixUnaryExpression[pmd-kotlin:matchesSig('java.util.concurrent.ForkJoinPool#submit(*)')]
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.springframework.web.client.RestTemplate
+class Service(val restTemplate: RestTemplate) {
+    val items = listOf("a", "b")
+    fun bad() = items.parallelStream().forEach { restTemplate.getForObject("/api/$it", String::class.java) } // bad: blocks common pool
+    fun good() = kotlinx.coroutines.runBlocking { items.map { kotlinx.coroutines.async(kotlinx.coroutines.Dispatchers.IO) { restTemplate.getForObject("/api/$it", String::class.java) } }.map { it.await() } } // ok: IO dispatcher
+}
+        ]]>
+        </example>
+    </rule>
+
 </ruleset>

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: MDC.setContextMap in Flux-returning function</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.MDC
+import reactor.core.publisher.Flux
+
+class Service {
+    fun processItems(items: List<String>): Flux<String> {
+        MDC.setContextMap(mapOf("traceId" to "123")) // bad: MDC not propagated in Reactor
+        return Flux.fromIterable(items).map { it.uppercase() }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: MDC.setContextMap in Mono-returning function</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.MDC
+import reactor.core.publisher.Mono
+
+class Service {
+    fun processItem(item: String): Mono<String> {
+        MDC.setContextMap(mapOf("traceId" to "123")) // bad: use Reactor context instead
+        return Mono.just(item.uppercase())
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: MDC.setContextMap in function with Context parameter</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.MDC
+import reactor.util.context.Context
+
+class Service {
+    fun handle(ctx: Context) {
+        MDC.setContextMap(emptyMap()) // bad: Context is available, use it
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: MDC.setContextMap in regular non-Reactor function</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.MDC
+
+class Service {
+    fun handleRequest(traceId: String): String {
+        MDC.setContextMap(mapOf("traceId" to traceId)) // ok: regular thread-based code
+        return traceId
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

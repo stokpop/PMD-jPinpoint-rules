@@ -662,4 +662,48 @@ class Good {
         </example>
     </rule>
 
+    <rule name="AvoidLeakingRetryEventConsumers"
+          message="Avoid registering retry event consumers inside methods; they leak lambda objects on each call."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi15">
+        <description>Problem: Calling getEventPublisher().onRetry/onError on a class-field Retry inside a method body
+            adds a new lambda consumer on every method call, causing a memory leak.
+            Solution: Register event consumers once in an init block or constructor.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,memory,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('io.github.resilience4j.retry.Retry#getEventPublisher(*)')
+    and pmd-kotlin:isWithin('function-body')
+    and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+        ancestor::ClassBody[1]//PropertyDeclaration[
+            not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+        ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import io.github.resilience4j.retry.Retry
+import io.github.resilience4j.retry.RetryRegistry
+import java.util.concurrent.atomic.AtomicInteger
+class Service(registry: RetryRegistry) {
+    private val retryField: Retry = registry.retry("svc")
+    private val count = AtomicInteger()
+    init {
+        retryField.getEventPublisher().onRetry { count.getAndIncrement() } // ok: registered once
+    }
+    fun callService() { // avoid: retryField.getEventPublisher().onRetry { ... } here
+        retryField.executeCallable { "result" }
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
 </ruleset>
