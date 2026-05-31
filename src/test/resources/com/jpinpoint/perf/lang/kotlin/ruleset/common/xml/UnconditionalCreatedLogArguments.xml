@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: created log arguments without guard</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>9,13</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class EventBuilder {
+    fun build(): String = "event"
+}
+class LogService(private val log: Logger) {
+    fun processOrder() {
+        val event = EventBuilder().build()
+        log.debug("Processing: {}", event)
+    }
+    fun handle(items: List<String>) {
+        val summary = items.joinToString()
+        log.trace("Items: {}", summary)
+    }
+    fun processGuarded() {
+        if (log.isDebugEnabled) {
+            val event = EventBuilder().build()
+            log.debug("Processing: {}", event)
+        }
+    }
+    fun processGood(orderId: String) {
+        log.debug("Processing order: {}", orderId)
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

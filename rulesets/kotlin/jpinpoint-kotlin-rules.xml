@@ -1727,6 +1727,58 @@ class BadElement
         ]]></example>
     </rule>
 
+    <rule name="OptimizeMapOrSetForEnum"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Map has enum keys or Set has enum elements, use EnumMap or EnumSet for more efficiency."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#iuoc03">
+        <description>Problem: HashMap and HashSet are relatively memory hungry for enum keys and elements.&#13;
+            Solution: prefer EnumMap or EnumSet when the key or element type is an enum declared in the same Kotlin file. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,memory,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier = ('Map', 'HashMap', 'LinkedHashMap', 'MutableMap')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier =
+        ancestor::KotlinFile[1]//ClassDeclaration[contains(concat(' ', @Modifiers, ' '), ' enum ')]/@Identifier
+    and Expression//PostfixUnaryExpression[
+        not(ancestor::ValueArgument)
+        and PrimaryExpression/@Identifier != 'EnumMap'
+    ]
+]
+|
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier = ('Set', 'HashSet', 'MutableSet')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier =
+        ancestor::KotlinFile[1]//ClassDeclaration[contains(concat(' ', @Modifiers, ' '), ' enum ')]/@Identifier
+    and Expression//PostfixUnaryExpression[
+        not(ancestor::ValueArgument)
+        and PrimaryExpression/@Identifier != 'EnumSet'
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.EnumMap
+import java.util.EnumSet
+import java.util.HashMap
+import java.util.HashSet
+
+enum class Status { ACTIVE, INACTIVE }
+class Bad {
+    val statusMap: HashMap<Status, String> = HashMap() // bad
+    val statusSet: HashSet<Status> = HashSet() // bad
+}
+class Good {
+    val statusMap: EnumMap<Status, String> = EnumMap(Status::class.java)
+    val statusSet: EnumSet<Status> = EnumSet.allOf(Status::class.java)
+}
+        ]]></example>
+    </rule>
+
     <rule name="UnconditionalConcatInLogArgument"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
@@ -1774,6 +1826,58 @@ class LoggingService(private val log: Logger) {
 
     fun good(userId: String) {
         log.debug("Getting user {}", userId) // good
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="UnconditionalCreatedLogArguments"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid unconditional creation of a log argument, it may not be needed."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#il06">
+        <description>Problem: creating log arguments eagerly does work regardless of the active log level.&#13;
+            Solution: build such arguments conditionally behind an enabled check, or pass cheaper values directly. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    ancestor::FunctionBody
+    and PrimaryExpression/@Identifier = 'log'
+    and PostfixUnarySuffix/NavigationSuffix/@Identifier = ('trace', 'debug', 'info')
+    and not(
+        ancestor::IfExpression[
+            .//PostfixUnaryExpression[
+                PrimaryExpression/@Identifier = 'log'
+                and PostfixUnarySuffix/NavigationSuffix/@Identifier = ('isTraceEnabled', 'isDebugEnabled', 'isInfoEnabled')
+            ]
+        ]
+    )
+    and PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument/Expression//PrimaryExpression/@Identifier =
+        ancestor::FunctionBody[1]//PropertyDeclaration[
+            not(ancestor::LambdaLiteral)
+            and Expression//PostfixUnaryExpression[
+                not(ancestor::ValueArgument)
+                and PostfixUnarySuffix/CallSuffix
+                and not(PostfixUnarySuffix/NavigationSuffix[starts-with(@Identifier, 'get')])
+            ]
+        ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.slf4j.Logger
+
+class EventBuilder {
+    fun build(): String = "event"
+}
+class LogService(private val log: Logger) {
+    fun bad() {
+        val event = EventBuilder().build()
+        log.debug("Processing: {}", event) // bad
     }
 }
         ]]></example>
@@ -4620,6 +4724,50 @@ class GoodHttpClientV5 {
 }
 ]]>
         </example>
+    </rule>
+
+    <rule name="HttpClientImproperConnectionTimeouts"
+          message="ApacheHttpClient RequestConfig connectionRequestTimeout and connectTimeout have values which are typically too high."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi20">
+        <description>Problem: connectionRequestTimeout and connectTimeout above roughly 500 milliseconds often indicate confused units or overly slow fail-fast behaviour.&#13;
+            Solution: keep these connection establishment timeouts small and explicit. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="io,jpinpoint-rule,performance,sustainability-low,resilience" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//CallSuffix[
+    ValueArguments/ValueArgument/Expression//T-IntegerLiteral[number(@Text) > 500]
+    and parent::PostfixUnarySuffix/preceding-sibling::PostfixUnarySuffix[1]/NavigationSuffix/@Identifier = ('setConnectionRequestTimeout', 'setConnectTimeout')
+]
+|
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and (pmd-kotlin:typeIs('kotlin.Int') or pmd-kotlin:typeIs('kotlin.Long')
+         or pmd-kotlin:typeIs('java.lang.Integer') or pmd-kotlin:typeIs('java.lang.Long'))
+    and Expression//T-IntegerLiteral[number(@Text) > 500]
+    and VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//CallSuffix[
+        parent::PostfixUnarySuffix/preceding-sibling::PostfixUnarySuffix[1]/NavigationSuffix/@Identifier = ('setConnectionRequestTimeout', 'setConnectTimeout')
+    ]/ValueArguments/ValueArgument/Expression//PrimaryExpression/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.http.client.config.RequestConfig
+
+class BadTimeouts {
+    private val connectTimeout: Int = 5000 // bad
+
+    fun buildConfig(): RequestConfig =
+        RequestConfig.custom()
+            .setConnectTimeout(5000) // bad
+            .setConnectionRequestTimeout(3000) // bad
+            .build()
+}
+        ]]></example>
     </rule>
 
     <rule name="HttpInterceptorNotReleasingOnException"

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: enum map and set use hash implementations</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>8,9</expected-linenumbers>
+        <code><![CDATA[
+import java.util.EnumMap
+import java.util.EnumSet
+import java.util.HashMap
+import java.util.HashSet
+
+enum class Status { ACTIVE, INACTIVE }
+class Bad {
+    val statusMap: HashMap<Status, String> = HashMap() // bad
+    val statusSet: HashSet<Status> = HashSet() // bad
+}
+class Good {
+    val statusMap: EnumMap<Status, String> = EnumMap(Status::class.java)
+    val statusSet: EnumSet<Status> = EnumSet.allOf(Status::class.java)
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: non enum map key is not flagged</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.HashMap
+
+class GoodStrings {
+    val values: HashMap<String, String> = HashMap()
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

@@ -1337,6 +1337,58 @@ class LoggingService(private val log: Logger) {
         ]]></example>
     </rule>
 
+    <rule name="UnconditionalCreatedLogArguments"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid unconditional creation of a log argument, it may not be needed."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#il06">
+        <description>Problem: creating log arguments eagerly does work regardless of the active log level.&#13;
+            Solution: build such arguments conditionally behind an enabled check, or pass cheaper values directly. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    ancestor::FunctionBody
+    and PrimaryExpression/@Identifier = 'log'
+    and PostfixUnarySuffix/NavigationSuffix/@Identifier = ('trace', 'debug', 'info')
+    and not(
+        ancestor::IfExpression[
+            .//PostfixUnaryExpression[
+                PrimaryExpression/@Identifier = 'log'
+                and PostfixUnarySuffix/NavigationSuffix/@Identifier = ('isTraceEnabled', 'isDebugEnabled', 'isInfoEnabled')
+            ]
+        ]
+    )
+    and PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument/Expression//PrimaryExpression/@Identifier =
+        ancestor::FunctionBody[1]//PropertyDeclaration[
+            not(ancestor::LambdaLiteral)
+            and Expression//PostfixUnaryExpression[
+                not(ancestor::ValueArgument)
+                and PostfixUnarySuffix/CallSuffix
+                and not(PostfixUnarySuffix/NavigationSuffix[starts-with(@Identifier, 'get')])
+            ]
+        ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.slf4j.Logger
+
+class EventBuilder {
+    fun build(): String = "event"
+}
+class LogService(private val log: Logger) {
+    fun bad() {
+        val event = EventBuilder().build()
+        log.debug("Processing: {}", event) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidUnnecessaryStringBuilderCreation"
           language="kotlin"
           message="Use concatenation (+) instead of new StringBuilder if only one statement."
@@ -1499,6 +1551,58 @@ fun process() {}
         <example><![CDATA[
 @Suppress("AvoidMutableStaticFields") // bad
 fun process() {}
+        ]]></example>
+    </rule>
+
+    <rule name="OptimizeMapOrSetForEnum"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Map has enum keys or Set has enum elements, use EnumMap or EnumSet for more efficiency."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iuoc03">
+        <description>Problem: HashMap and HashSet are relatively memory hungry for enum keys and elements.&#13;
+            Solution: prefer EnumMap or EnumSet when the key or element type is an enum declared in the same Kotlin file. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,memory,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier = ('Map', 'HashMap', 'LinkedHashMap', 'MutableMap')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier =
+        ancestor::KotlinFile[1]//ClassDeclaration[contains(concat(' ', @Modifiers, ' '), ' enum ')]/@Identifier
+    and Expression//PostfixUnaryExpression[
+        not(ancestor::ValueArgument)
+        and PrimaryExpression/@Identifier != 'EnumMap'
+    ]
+]
+|
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier = ('Set', 'HashSet', 'MutableSet')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier =
+        ancestor::KotlinFile[1]//ClassDeclaration[contains(concat(' ', @Modifiers, ' '), ' enum ')]/@Identifier
+    and Expression//PostfixUnaryExpression[
+        not(ancestor::ValueArgument)
+        and PrimaryExpression/@Identifier != 'EnumSet'
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.EnumMap
+import java.util.EnumSet
+import java.util.HashMap
+import java.util.HashSet
+
+enum class Status { ACTIVE, INACTIVE }
+class Bad {
+    val statusMap: HashMap<Status, String> = HashMap() // bad
+    val statusSet: HashSet<Status> = HashSet() // bad
+}
+class Good {
+    val statusMap: EnumMap<Status, String> = EnumMap(Status::class.java)
+    val statusSet: EnumSet<Status> = EnumSet.allOf(Status::class.java)
+}
         ]]></example>
     </rule>
 

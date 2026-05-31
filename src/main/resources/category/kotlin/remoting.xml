@@ -879,6 +879,50 @@ class GoodConnectionConfig {
 }
         ]]></example>
     </rule>
+
+    <rule name="HttpClientImproperConnectionTimeouts"
+          message="ApacheHttpClient RequestConfig connectionRequestTimeout and connectTimeout have values which are typically too high."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi20">
+        <description>Problem: connectionRequestTimeout and connectTimeout above roughly 500 milliseconds often indicate confused units or overly slow fail-fast behaviour.&#13;
+            Solution: keep these connection establishment timeouts small and explicit. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="io,jpinpoint-rule,performance,sustainability-low,resilience" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//CallSuffix[
+    ValueArguments/ValueArgument/Expression//T-IntegerLiteral[number(@Text) > 500]
+    and parent::PostfixUnarySuffix/preceding-sibling::PostfixUnarySuffix[1]/NavigationSuffix/@Identifier = ('setConnectionRequestTimeout', 'setConnectTimeout')
+]
+|
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and (pmd-kotlin:typeIs('kotlin.Int') or pmd-kotlin:typeIs('kotlin.Long')
+         or pmd-kotlin:typeIs('java.lang.Integer') or pmd-kotlin:typeIs('java.lang.Long'))
+    and Expression//T-IntegerLiteral[number(@Text) > 500]
+    and VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//CallSuffix[
+        parent::PostfixUnarySuffix/preceding-sibling::PostfixUnarySuffix[1]/NavigationSuffix/@Identifier = ('setConnectionRequestTimeout', 'setConnectTimeout')
+    ]/ValueArguments/ValueArgument/Expression//PrimaryExpression/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.http.client.config.RequestConfig
+
+class BadTimeouts {
+    private val connectTimeout: Int = 5000 // bad
+
+    fun buildConfig(): RequestConfig =
+        RequestConfig.custom()
+            .setConnectTimeout(5000) // bad
+            .setConnectionRequestTimeout(3000) // bad
+            .build()
+}
+        ]]></example>
+    </rule>
     <rule name="UseCloseableForHttpClient"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
