@@ -543,4 +543,123 @@ class Bad {
         </example>
     </rule>
 
+
+    <rule name="JAXBContextCreatedForEachMethodCall"
+          message="JAXBContext is created for each method call, which is expensive."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iuoxar04">
+        <description>Problem: JAXBContext creation is expensive: it scans classpath for JAXB-annotated classes.
+            Solution: Create and cache the JAXBContext once (e.g. in a companion object or lazy property) and reuse it.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('javax.xml.bind.JAXBContext#newInstance(*)')
+     or pmd-kotlin:matchesSig('jakarta.xml.bind.JAXBContext#newInstance(*)'))
+    and (pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and not(ancestor::PropertyDelegate)
+    and not(ancestor::FunctionDeclaration[
+        pmd-kotlin:hasAnnotation('PostConstruct')
+        or pmd-kotlin:hasAnnotation('javax.annotation.PostConstruct')
+        or pmd-kotlin:hasAnnotation('jakarta.annotation.PostConstruct')
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import javax.xml.bind.JAXBContext
+
+class Bad {
+    fun marshal(obj: Any): String {
+        val ctx = JAXBContext.newInstance(obj::class.java) // bad: recreated per call
+        return ctx.createMarshaller().run { java.io.StringWriter().also { marshal(obj, it) }.toString() }
+    }
+}
+class Good {
+    companion object {
+        private val CTX = JAXBContext.newInstance(Good::class.java) // ok: created once
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidReactorDebugOverhead"
+          message="Do not use Reactor debugging in production, it has much overhead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi14">
+        <description>Problem: For troubleshooting Reactor, Blockhound can be used. It needs proper stack traces which
+            can be achieved by Hooks.onOperatorDebug(). This can have much CPU overhead.
+            Solution: Remove Hooks.onOperatorDebug() when not debugging. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('reactor.core.publisher.Hooks#onOperatorDebug()')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import reactor.core.publisher.Hooks
+
+class AppConfig {
+    init {
+        Hooks.onOperatorDebug() // bad: heavy overhead in production
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidRecreatingHttpClient"
+          message="An HttpClient is created inside a method. Create and reuse it as a shared field instead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi12">
+        <description>Problem: Apache HttpClient with its connection pool and timeouts should be setup once and then used
+            for many requests. It is quite expensive to create and can only provide the benefits of pooling when reused.
+            Solution: Create the HttpClient once and store it in a shared field (companion object or injected bean).
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('org.apache.http.impl.client.HttpClientBuilder#create(*)')
+     or pmd-kotlin:matchesSig('org.apache.http.impl.client.HttpClients#custom(*)')
+     or pmd-kotlin:matchesSig('org.apache.http.impl.nio.client.HttpAsyncClientBuilder#create(*)'))
+    and (pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and not(ancestor::PropertyDelegate)
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.apache.http.impl.client.HttpClients
+
+class Bad {
+    fun doRequest(url: String) =
+        HttpClients.custom().build() // bad: recreated per call
+            .execute(org.apache.http.client.methods.HttpGet(url))
+}
+class Good {
+    companion object {
+        private val HTTP_CLIENT = HttpClients.custom().build() // ok: created once
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
 </ruleset>

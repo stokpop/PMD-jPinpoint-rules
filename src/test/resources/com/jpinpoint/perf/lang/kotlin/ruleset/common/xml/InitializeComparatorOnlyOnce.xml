@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: Comparator.comparing in function body</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.Comparator
+
+data class Person(val name: String, val age: Int)
+
+fun sortByName(people: List<Person>) = people.sortedWith(Comparator.comparing { it.name })
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: Comparator.comparing in lambda (map/sort)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import java.util.Comparator
+
+data class Person(val name: String, val age: Int)
+
+class PersonService {
+    fun sortGroups(groups: List<List<Person>>) = groups.map { group ->
+        group.sortedWith(Comparator.comparing(Person::name)) // bad: Comparator recreated per group
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: Comparator.comparingInt in function body</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.Comparator
+
+data class Person(val name: String, val age: Int)
+
+fun sortByAge(people: List<Person>) = people.sortedWith(Comparator.comparingInt { it.age })
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: Comparator in companion object (reused)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.Comparator
+
+data class Person(val name: String, val age: Int)
+
+class PersonSorter {
+    companion object {
+        private val BY_NAME = Comparator.comparing(Person::name) // ok: created once
+    }
+    fun sort(people: List<Person>) = people.sortedWith(BY_NAME)
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: Kotlin compareBy (idiomatic Kotlin native comparator)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+data class Person(val name: String, val age: Int)
+
+val BY_NAME = compareBy(Person::name) // ok: Kotlin idiom, defined at top level
+fun sortByName(people: List<Person>) = people.sortedWith(BY_NAME)
+        ]]></code>
+    </test-code>
+
+</test-data>

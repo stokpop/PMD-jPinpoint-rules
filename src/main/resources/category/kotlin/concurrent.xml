@@ -1304,4 +1304,48 @@ class Bad {
         </example>
     </rule>
 
+    <rule name="AvoidThreadUnsafeJaxbUsage"
+          message="A JAXB Marshaller, Unmarshaller or Validator is used as a class field; they are not thread-safe."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#IUOXAR07">
+        <description>Problem: JAXB Marshaller, Unmarshaller and Validator are not thread-safe.
+            Solution: Create a new instance every time you need to marshal, unmarshal or validate.
+            Declare them as local variables in the function body or lambda, not as class fields.
+            (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and (pmd-kotlin:typeIs('javax.xml.bind.Marshaller')
+         or pmd-kotlin:typeIs('javax.xml.bind.Unmarshaller')
+         or pmd-kotlin:typeIs('javax.xml.bind.Validator')
+         or pmd-kotlin:typeIs('jakarta.xml.bind.Marshaller')
+         or pmd-kotlin:typeIs('jakarta.xml.bind.Unmarshaller')
+         or pmd-kotlin:typeIs('jakarta.xml.bind.Validator')
+         or pmd-kotlin:typeIs('javax.xml.validation.Validator'))
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import javax.xml.bind.JAXBContext
+import javax.xml.bind.Marshaller
+class Bad {
+    private val marshaller: Marshaller = JAXBContext.newInstance(Bad::class.java).createMarshaller() // bad: not thread-safe
+}
+class Good {
+    companion object { private val CTX = JAXBContext.newInstance(Good::class.java) }
+    fun marshal(obj: Good) {
+        val marshaller = CTX.createMarshaller() // ok: local variable
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
 </ruleset>

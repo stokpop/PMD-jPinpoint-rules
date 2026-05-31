@@ -879,4 +879,119 @@ fun good(name: String): ByteArray =
         </example>
     </rule>
 
+    <rule name="BufferFilesNewStream"
+          message="Files.newInputStream or newOutputStream is not buffered."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isio06">
+        <description>Problem: Files.newInputStream or Files.newOutputStream is not buffered.
+            The stream is read from/written to file byte by byte, where each OS call has overhead making it slow.
+            Solution: Wrap with BufferedInputStream / BufferedOutputStream, or use Files.newBufferedReader/newBufferedWriter.
+            (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="cpu,io,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('java.nio.file.Files#newInputStream(*)')
+     or pmd-kotlin:matchesSig('java.nio.file.Files#newOutputStream(*)'))
+    and not(ancestor::PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('java.io.BufferedInputStream#<init>(*)')
+        or pmd-kotlin:matchesSig('java.io.BufferedOutputStream#<init>(*)')
+        or pmd-kotlin:matchesSig('java.io.BufferedReader#<init>(*)')
+        or pmd-kotlin:matchesSig('java.io.BufferedWriter#<init>(*)')
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.io.BufferedInputStream
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun bad(path: Path) = Files.newInputStream(path).use { it.readAllBytes() } // bad
+fun good(path: Path) = BufferedInputStream(Files.newInputStream(path)).use { it.readAllBytes() } // ok
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="InitializeComparatorOnlyOnce"
+          message="A Comparator is initialized inside a method or lambda; initialize it once as a shared field."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ue03">
+        <description>Problem: Creating Comparator instances repeatedly in functions is inefficient.
+            Solution: Initialize the Comparator once as a companion object val or top-level val and reuse.
+            For idiomatic Kotlin, prefer compareBy/compareByDescending at top-level or companion object.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,performance,sustainability-medium,cpu" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('java.util.Comparator#comparing(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#comparingInt(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#comparingDouble(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#comparingLong(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#nullsFirst(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#nullsLast(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#reversed()'))
+    and (pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and not(ancestor::PropertyDelegate)
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.util.Comparator
+data class Person(val name: String)
+class PersonSorter {
+    fun sortBad(people: List<Person>) = people.sortedWith(Comparator.comparing { it.name }) // bad: recreated per call
+    companion object {
+        val BY_NAME = Comparator.comparing(Person::name) // ok: created once
+    }
+    fun sortGood(people: List<Person>) = people.sortedWith(BY_NAME)
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidReStreamingEnumValues"
+          message="Avoid repeated streaming of enum values(); use a cached lookup map or values().firstOrNull."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iuoc07">
+        <description>Problem: The time to find an enum value by field is O(n). Streaming enum values() repeatedly is inefficient.
+            Solution: Use a companion object map for O(1) lookup, or use the idiomatic Kotlin values().firstOrNull { }.
+            (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('java.util.stream.Stream#findFirst()')
+     or pmd-kotlin:matchesSig('java.util.stream.Stream#findAny()'))
+    and (pmd-kotlin:matchesSig('java.util.stream.Stream#of(*)')
+         or pmd-kotlin:matchesSig('java.util.Arrays#stream(*)'))
+    and .//PostfixUnaryExpression[pmd-kotlin:matchesSig('_#values()')]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.util.stream.Stream
+enum class Status(val code: String) { ACTIVE("A"), INACTIVE("I"), PENDING("P"), DELETED("D") }
+fun bad(code: String) = Stream.of(*Status.values()).filter { it.code == code }.findFirst().orElse(null) // bad
+fun good(code: String) = Status.values().firstOrNull { it.code == code } // ok: idiomatic Kotlin
+        ]]>
+        </example>
+    </rule>
+
 </ruleset>

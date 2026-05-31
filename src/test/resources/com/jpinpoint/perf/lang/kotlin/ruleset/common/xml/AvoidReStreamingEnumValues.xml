@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: Stream.of(*values()).filter.findFirst</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import java.util.stream.Stream
+
+enum class Status(val code: String) { ACTIVE("A"), INACTIVE("I"), PENDING("P") }
+
+fun fromCode(code: String): Status? =
+    Stream.of(*Status.values())
+        .filter { it.code == code }.findFirst().orElse(null) // bad: streaming enum on each call
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: Arrays.stream(values()).findFirst</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import java.util.Arrays
+
+enum class Color(val hex: String) { RED("#FF0000"), GREEN("#00FF00"), BLUE("#0000FF") }
+
+fun fromHex(hex: String): Color? =
+    Arrays.stream(Color.values())
+        .filter { it.hex == hex }.findFirst().orElse(null) // bad: re-streaming each time
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: Stream.of(*values()).findAny in lambda</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import java.util.stream.Stream
+
+enum class Priority { LOW, MEDIUM, HIGH }
+
+fun findFirst(codes: List<String>) = codes.map { code ->
+    Stream.of(*Priority.values())
+        .filter { it.name == code }.findAny().orElse(null) // bad: streaming inside lambda
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: idiomatic Kotlin values().firstOrNull</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+enum class Status(val code: String) { ACTIVE("A"), INACTIVE("I"), PENDING("P") }
+
+fun fromCode(code: String): Status? = Status.values().firstOrNull { it.code == code } // ok: no stream
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: cached lookup map (idiomatic Kotlin companion object)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+enum class Status(val code: String) {
+    ACTIVE("A"), INACTIVE("I"), PENDING("P");
+    companion object {
+        private val BY_CODE = values().associateBy { it.code } // ok: map built once
+        fun fromCode(code: String): Status? = BY_CODE[code]
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
