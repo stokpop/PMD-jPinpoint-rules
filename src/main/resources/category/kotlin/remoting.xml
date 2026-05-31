@@ -1058,4 +1058,92 @@ class AxualBad {
 }
         ]]></example>
     </rule>
+    <rule name="AvoidClientHttpRequestFactorySupplier"
+          language="kotlin"
+          message="Avoid ClientHttpRequestFactorySupplier; create a request factory explicitly."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iuoxar03">
+        <description>Problem: ClientHttpRequestFactorySupplier hides request factory details and can make tuning harder.
+            Solution: create the request factory explicitly and configure the underlying HTTP client directly. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="io,jpinpoint-rule,performance,resilience" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PostfixUnarySuffix/CallSuffix
+    and (
+        pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#<init>(*)')
+        or pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#<init>()')
+        or pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#new(*)')
+        or pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#new()')
+        or PrimaryExpression[@Identifier='ClientHttpRequestFactorySupplier']
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.boot.web.client.ClientHttpRequestFactorySupplier
+
+fun bad() {
+    val supplier = ClientHttpRequestFactorySupplier() // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="HttpInterceptorNotReleasingOnException"
+          language="kotlin"
+          message="Close ClientHttpResponse before throwing from an interceptor validation path."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi11">
+        <description>Problem: throwing from a ClientHttpRequestInterceptor validation path without closing the response can leak resources.
+            Solution: close the ClientHttpResponse explicitly, or use response.use { ... }. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="io,jpinpoint-rule,performance,resilience" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//IfExpression[
+    ancestor::FunctionDeclaration[@Identifier='intercept']
+    and ancestor::FunctionBody[1]//PropertyDeclaration[
+        VariableDeclaration/@Identifier='response'
+        and (
+            Expression//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.springframework.http.client.ClientHttpRequestExecution#execute(*)')]
+            or Expression//NavigationSuffix/@Identifier='execute'
+        )
+    ]
+    and .//SimpleIdentifier/T-Identifier[@Text='response']
+    and .//*[@Text='throw']
+    and not(.//PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('org.springframework.http.client.ClientHttpResponse#close()')
+        or PostfixUnarySuffix/NavigationSuffix/@Identifier = 'close'
+    ])
+    and not(ancestor::FunctionDeclaration[1]//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/@Identifier = 'use'
+    ])
+    and not(ancestor::FunctionDeclaration[1]//CatchBlock//PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('org.springframework.http.client.ClientHttpResponse#close()')
+        or PostfixUnarySuffix/NavigationSuffix/@Identifier = 'close'
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class BadInterceptor : org.springframework.http.client.ClientHttpRequestInterceptor {
+    override fun intercept(
+        request: org.springframework.http.HttpRequest,
+        body: ByteArray,
+        execution: org.springframework.http.client.ClientHttpRequestExecution
+    ): org.springframework.http.client.ClientHttpResponse {
+        val response = execution.execute(request, body)
+        if (!response.headers.containsKey("X-Ok")) {
+            throw IllegalStateException("missing header") // bad
+        }
+        return response
+    }
+}
+        ]]></example>
+    </rule>
 </ruleset>

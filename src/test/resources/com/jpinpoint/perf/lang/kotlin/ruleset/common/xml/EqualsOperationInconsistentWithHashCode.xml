@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>bad: equals lowercases but hashCode does not</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class BadLowercase(private val name: String) {
+    override fun equals(other: Any?): Boolean {
+        return other is BadLowercase && name.lowercase() == other.name.lowercase()
+    }
+
+    override fun hashCode(): Int {
+        return name.hashCode()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: equals and hashCode both lowercase</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodLowercase(private val name: String) {
+    override fun equals(other: Any?): Boolean {
+        return other is GoodLowercase && name.lowercase() == other.name.lowercase()
+    }
+
+    override fun hashCode(): Int {
+        return name.lowercase().hashCode()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: data class uses generated equals and hashCode</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+data class GoodData(val name: String)
+        ]]></code>
+    </test-code>
+</test-data>

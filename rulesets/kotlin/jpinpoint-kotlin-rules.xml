@@ -737,6 +737,36 @@ class Good {
         </example>
     </rule>
 
+    <rule name="AvoidReflectionInToStringAndHashCode"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid reflection-based equals and hashCode helpers."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ipb06">
+        <description>Problem: reflection-based EqualsBuilder and HashCodeBuilder variants are slower than explicit field comparisons.
+            Solution: compare relevant fields directly, or use Kotlin data classes where appropriate. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.apache.commons.lang3.builder.EqualsBuilder#reflectionEquals(*)')
+    or pmd-kotlin:matchesSig('org.apache.commons.lang3.builder.HashCodeBuilder#reflectionHashCode(*)')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.commons.lang3.builder.EqualsBuilder
+
+class Bad(private val id: String) {
+    override fun equals(other: Any?): Boolean {
+        return EqualsBuilder.reflectionEquals(this, other) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidSimpleDateFormat"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
@@ -869,6 +899,65 @@ class Bad {
 }
 class Good {
     fun setTimeout(timeout: kotlin.time.Duration) = timeout // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidUnconditionalBuiltLogStrings"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid building StringBuilder/StringBuffer log messages unconditionally."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ilo04">
+        <description>Problem: eagerly building StringBuilder/StringBuffer based log messages performs work regardless of log level.
+            Solution: use SLF4J placeholders or guard the statement with a log level check. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:isWithin('function-body')
+    and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) = 1
+    and (
+        pmd-kotlin:matchesSig('org.slf4j.Logger#trace(*)')
+        or pmd-kotlin:matchesSig('org.slf4j.Logger#debug(*)')
+        or pmd-kotlin:matchesSig('org.slf4j.Logger#info(*)')
+        or PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = 'log'
+    )
+    and PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+        ancestor::FunctionBody[1]//PropertyDeclaration[
+            pmd-kotlin:isWithin('function-body')
+            and (
+                pmd-kotlin:typeIs('java.lang.StringBuilder')
+                or pmd-kotlin:typeIs('java.lang.StringBuffer')
+                or Expression//PostfixUnaryExpression[
+                    pmd-kotlin:matchesSig('java.lang.StringBuilder#<init>(*)')
+                    or pmd-kotlin:matchesSig('java.lang.StringBuilder#<init>()')
+                    or pmd-kotlin:matchesSig('java.lang.StringBuffer#<init>(*)')
+                    or pmd-kotlin:matchesSig('java.lang.StringBuffer#<init>()')
+                ]
+                or Expression//PrimaryExpression[@Identifier = ('StringBuilder', 'StringBuffer')]
+            )
+        ]/VariableDeclaration/@Identifier
+    and not(
+        ancestor::IfExpression[
+            .//PostfixUnaryExpression[
+                PostfixUnarySuffix/NavigationSuffix/@Identifier = ('isTraceEnabled', 'isDebugEnabled', 'isInfoEnabled')
+            ]
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad(userId: String) {
+        val sb = StringBuilder().append("User: ").append(userId)
+        log.debug(sb.toString()) // bad
+    }
 }
         ]]></example>
     </rule>
@@ -1112,6 +1201,89 @@ fun good(path: Path) = BufferedInputStream(Files.newInputStream(path)).use { it.
         </example>
     </rule>
 
+    <rule name="EqualsOperationInconsistentWithHashCode"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="equals applies case normalization that hashCode does not."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodeQuality.md#ieah02">
+        <description>Problem: normalizing text in equals but not in hashCode makes object identity inconsistent for hash-based collections.
+            Solution: use the same normalization in both equals and hashCode. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="correctness,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//FunctionDeclaration[
+    @Identifier='equals'
+    and count(FunctionValueParameters//FunctionValueParameter) = 1
+    and FunctionBody//PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('java.lang.String#toLowerCase(*)')
+        or pmd-kotlin:matchesSig('kotlin.String#lowercase(*)')
+        or pmd-kotlin:matchesSig('java.lang.String#toUpperCase(*)')
+        or pmd-kotlin:matchesSig('kotlin.String#uppercase(*)')
+    ]
+    and ancestor::ClassBody[1]//FunctionDeclaration[
+        @Identifier='hashCode'
+        and not(FunctionValueParameters//FunctionValueParameter)
+        and not(FunctionBody//PostfixUnaryExpression[
+            pmd-kotlin:matchesSig('java.lang.String#toLowerCase(*)')
+            or pmd-kotlin:matchesSig('kotlin.String#lowercase(*)')
+            or pmd-kotlin:matchesSig('java.lang.String#toUpperCase(*)')
+            or pmd-kotlin:matchesSig('kotlin.String#uppercase(*)')
+        ])
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad(private val name: String) {
+    override fun equals(other: Any?): Boolean = other is Bad && name.lowercase() == other.name.lowercase()
+    override fun hashCode(): Int = name.hashCode() // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="FieldOfHashCodeMissingInEquals"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="A property is used in hashCode but not in equals."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodeQuality.md#ieah05">
+        <description>Problem: using a property in hashCode but omitting it from equals can make objects behave unexpectedly in hash-based collections.
+            Solution: use the same relevant properties in both equals and hashCode. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="correctness,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+][
+    VariableDeclaration/@Identifier = ancestor::ClassBody[1]//FunctionDeclaration[
+        @Identifier='hashCode' and not(FunctionValueParameters//FunctionValueParameter)
+    ]/FunctionBody//SimpleIdentifier/T-Identifier/@Text
+    and not(
+        VariableDeclaration/@Identifier = ancestor::ClassBody[1]//FunctionDeclaration[
+            @Identifier='equals' and count(FunctionValueParameters//FunctionValueParameter) = 1
+        ]/FunctionBody//SimpleIdentifier/T-Identifier/@Text
+    )
+    and not(
+        VariableDeclaration/@Identifier = ancestor::ClassBody[1]//FunctionDeclaration[
+            @Identifier='hashCode' and not(FunctionValueParameters//FunctionValueParameter)
+        ]/FunctionBody//Assignment//(DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad(id: String, name: String) {
+    private val id = id
+    private val name = name // bad
+}
+        ]]></example>
+    </rule>
+
     <rule name="HashCodeOnlyCallsSuper"
           language="kotlin"
           message="hashCode only calls super."
@@ -1151,6 +1323,43 @@ class Bad(private val id: String) {
     override fun equals(other: Any?): Boolean = other is Bad && id == other.id
     override fun hashCode(): Int = super.hashCode() // bad
 }
+        ]]></example>
+    </rule>
+
+    <rule name="ImplementEqualsHashCodeOnValueObjects"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Regular value objects with multiple properties should implement equals and hashCode, or be a data class."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodeQuality.md#ssw01">
+        <description>Problem: regular value objects with multiple properties but no equals/hashCode are easy to misuse in collections and comparisons.
+            Solution: use a Kotlin data class or implement equals and hashCode explicitly. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//ClassDeclaration[
+    not(contains(concat(' ', @Modifiers, ' '), ' data '))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service'))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component'))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller'))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.stereotype.Repository'))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.web.bind.annotation.RestController'))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Configuration'))
+    and not(pmd-kotlin:hasAnnotation('jakarta.persistence.Entity'))
+    and not(pmd-kotlin:hasAnnotation('javax.persistence.Entity'))
+    and (
+        count(ClassBody//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))])
+        + count(PrimaryConstructor//ClassParameter[@Identifier])
+    ) >= 2
+    and not(ClassBody//FunctionDeclaration[@Identifier='equals' and count(FunctionValueParameters//FunctionValueParameter) = 1])
+    and not(ClassBody//FunctionDeclaration[@Identifier='hashCode' and not(FunctionValueParameters//FunctionValueParameter)])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Point(val x: Int, val y: Int) // bad: prefer data class
         ]]></example>
     </rule>
 
@@ -3517,6 +3726,40 @@ class RightUseOfGuardedBy {
 
 <!-- END Included file 'concurrent.xml' -->
 <!-- BEGIN Included file 'remoting.xml' -->
+    <rule name="AvoidClientHttpRequestFactorySupplier"
+          language="kotlin"
+          message="Avoid ClientHttpRequestFactorySupplier; create a request factory explicitly."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#iuoxar03">
+        <description>Problem: ClientHttpRequestFactorySupplier hides request factory details and can make tuning harder.
+            Solution: create the request factory explicitly and configure the underlying HTTP client directly. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="io,jpinpoint-rule,performance,resilience" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PostfixUnarySuffix/CallSuffix
+    and (
+        pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#<init>(*)')
+        or pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#<init>()')
+        or pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#new(*)')
+        or pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#new()')
+        or PrimaryExpression[@Identifier='ClientHttpRequestFactorySupplier']
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.boot.web.client.ClientHttpRequestFactorySupplier
+
+fun bad() {
+    val supplier = ClientHttpRequestFactorySupplier() // bad
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidDeprecatedHttpConnectors"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
@@ -4377,6 +4620,61 @@ class GoodHttpClientV5 {
 }
 ]]>
         </example>
+    </rule>
+
+    <rule name="HttpInterceptorNotReleasingOnException"
+          language="kotlin"
+          message="Close ClientHttpResponse before throwing from an interceptor validation path."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi11">
+        <description>Problem: throwing from a ClientHttpRequestInterceptor validation path without closing the response can leak resources.
+            Solution: close the ClientHttpResponse explicitly, or use response.use { ... }. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="io,jpinpoint-rule,performance,resilience" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//IfExpression[
+    ancestor::FunctionDeclaration[@Identifier='intercept']
+    and ancestor::FunctionBody[1]//PropertyDeclaration[
+        VariableDeclaration/@Identifier='response'
+        and (
+            Expression//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.springframework.http.client.ClientHttpRequestExecution#execute(*)')]
+            or Expression//NavigationSuffix/@Identifier='execute'
+        )
+    ]
+    and .//SimpleIdentifier/T-Identifier[@Text='response']
+    and .//*[@Text='throw']
+    and not(.//PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('org.springframework.http.client.ClientHttpResponse#close()')
+        or PostfixUnarySuffix/NavigationSuffix/@Identifier = 'close'
+    ])
+    and not(ancestor::FunctionDeclaration[1]//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/@Identifier = 'use'
+    ])
+    and not(ancestor::FunctionDeclaration[1]//CatchBlock//PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('org.springframework.http.client.ClientHttpResponse#close()')
+        or PostfixUnarySuffix/NavigationSuffix/@Identifier = 'close'
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class BadInterceptor : org.springframework.http.client.ClientHttpRequestInterceptor {
+    override fun intercept(
+        request: org.springframework.http.HttpRequest,
+        body: ByteArray,
+        execution: org.springframework.http.client.ClientHttpRequestExecution
+    ): org.springframework.http.client.ClientHttpResponse {
+        val response = execution.execute(request, body)
+        if (!response.headers.containsKey("X-Ok")) {
+            throw IllegalStateException("missing header") // bad
+        }
+        return response
+    }
+}
+        ]]></example>
     </rule>
 
     <rule name="JAXBContextCreatedForEachMethodCall"

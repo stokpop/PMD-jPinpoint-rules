@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>bad: regular value object with primary constructor properties</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>1</expected-linenumbers>
+        <code><![CDATA[
+class Point(val x: Int, val y: Int)
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: regular class with two properties and no equals or hashCode</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>1</expected-linenumbers>
+        <code><![CDATA[
+class PersonId {
+    val first: String = ""
+    val last: String = ""
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: data class primary constructor properties</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+data class GoodPoint(val x: Int, val y: Int)
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: data class value object</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+data class PersonKey(val first: String, val last: String)
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: spring service is excluded</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Service
+
+@Service
+class OrderService(val repo: OrderRepository, val logger: Logger)
+
+class OrderRepository
+class Logger
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: explicit equals and hashCode</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class ExplicitPoint(val x: Int, val y: Int) {
+    override fun equals(other: Any?): Boolean {
+        return other is ExplicitPoint && x == other.x && y == other.y
+    }
+
+    override fun hashCode(): Int {
+        return 31 * x + y
+    }
+}
+        ]]></code>
+    </test-code>
+</test-data>

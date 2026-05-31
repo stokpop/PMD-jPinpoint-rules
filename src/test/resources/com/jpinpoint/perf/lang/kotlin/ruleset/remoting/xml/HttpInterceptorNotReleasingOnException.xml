@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>bad: interceptor throws without closing response</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>9</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.http.HttpRequest
+import org.springframework.http.client.ClientHttpRequestExecution
+import org.springframework.http.client.ClientHttpRequestInterceptor
+import org.springframework.http.client.ClientHttpResponse
+
+class BadInterceptor : ClientHttpRequestInterceptor {
+    override fun intercept(request: HttpRequest, body: ByteArray, execution: ClientHttpRequestExecution): ClientHttpResponse {
+        val response = execution.execute(request, body)
+        if (!response.headers.containsKey("X-Ok")) {
+            throw IllegalStateException("missing header")
+        }
+        return response
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: interceptor closes response before throw</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.http.HttpRequest
+import org.springframework.http.client.ClientHttpRequestExecution
+import org.springframework.http.client.ClientHttpRequestInterceptor
+import org.springframework.http.client.ClientHttpResponse
+
+class GoodInterceptor : ClientHttpRequestInterceptor {
+    override fun intercept(request: HttpRequest, body: ByteArray, execution: ClientHttpRequestExecution): ClientHttpResponse {
+        val response = execution.execute(request, body)
+        if (!response.headers.containsKey("X-Ok")) {
+            response.close()
+            throw IllegalStateException("missing header")
+        }
+        return response
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: interceptor uses response.use</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.http.HttpRequest
+import org.springframework.http.client.ClientHttpRequestExecution
+import org.springframework.http.client.ClientHttpRequestInterceptor
+import org.springframework.http.client.ClientHttpResponse
+
+class UseInterceptor : ClientHttpRequestInterceptor {
+    override fun intercept(request: HttpRequest, body: ByteArray, execution: ClientHttpRequestExecution): ClientHttpResponse {
+        val response = execution.execute(request, body)
+        response.use {
+            if (!it.headers.containsKey("X-Ok")) {
+                throw IllegalStateException("missing header")
+            }
+        }
+        return response
+    }
+}
+        ]]></code>
+    </test-code>
+</test-data>
