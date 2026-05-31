@@ -980,4 +980,82 @@ class ClientFactory {
 }
         ]]></example>
     </rule>
+
+    <rule name="HttpClientBuilderPoolSettingsIgnored"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="HttpClient builder is used with a ConnectionManager and MaxConn settings on the client are ignored. Remove them."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi09">
+        <description>Problem: when setConnectionManager is used, pool settings must be configured on that connection manager.
+            Client level setMaxConnTotal and setMaxConnPerRoute calls are ignored.&#13;
+            Solution: either configure the pool sizes on the connection manager or omit setConnectionManager and configure
+            the client builder directly. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="correctness,jpinpoint-rule,resilience" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//NavigationSuffix[
+    @Identifier = ('setMaxConnTotal', 'setMaxConnPerRoute')
+    and ancestor::FunctionBody[1][
+        .//PostfixUnaryExpression[
+            .//NavigationSuffix[@Identifier = 'setConnectionManager']
+            and (
+                pmd-kotlin:matchesSig('org.apache.http.impl.client.HttpClientBuilder#setConnectionManager(*)')
+                or pmd-kotlin:matchesSig('org.apache.http.impl.client.HttpClients#setConnectionManager(*)')
+                or pmd-kotlin:matchesSig('org.apache.http.impl.nio.client.HttpAsyncClientBuilder#setConnectionManager(*)')
+                or PostfixUnarySuffix/NavigationSuffix/@Identifier = 'setConnectionManager'
+            )
+        ]
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun bad(poolMgr: PoolingHttpClientConnectionManager) {
+    HttpClientBuilder.create()
+        .setConnectionManager(poolMgr)
+        .setMaxConnTotal(200) // bad, ignored
+        .build()
+}
+
+fun good(poolMgr: PoolingHttpClientConnectionManager) {
+    HttpClientBuilder.create()
+        .setConnectionManager(poolMgr)
+        .build()
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AxualProducerCreatedForEachMethodCall"
+          message="An Axual (Kafka) producer is created for each method call, which is expensive and takes resources."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ia10">
+        <description>Problem: each Producer takes threads and memory. If you create it in each method call, and call
+            this frequently, it can cause unnecessary resource usage and even OutOfMemoryError.&#13;
+            Solution: share Axual Producer instances as class-level properties or Spring beans. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    pmd-kotlin:isWithin('function-body')
+    and not(pmd-kotlin:isWithin('lambda'))
+    and pmd-kotlin:typeIs('io.axual.client.producer.Producer')
+    and not(ancestor::ClassDeclaration[pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Configuration')])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class AxualBad {
+    fun publish() {
+        val producer: Producer<String, String> = createProducer() // bad
+    }
+}
+        ]]></example>
+    </rule>
 </ruleset>

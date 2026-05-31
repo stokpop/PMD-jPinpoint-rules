@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: local Axual producer created inside function</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import io.axual.client.producer.Producer
+
+class AxualBad {
+    fun publish() {
+        val producer: Producer<String, String> = createProducer() // bad
+    }
+
+    private fun createProducer(): Producer<String, String> = TODO()
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: Spring configuration returns producer bean</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import io.axual.client.producer.Producer
+import org.springframework.context.annotation.Configuration
+
+@Configuration
+class AxualConfig {
+    fun producer(): Producer<String, String> = createProducer()
+
+    private fun createProducer(): Producer<String, String> = TODO()
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: producer is a class-level property</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import io.axual.client.producer.Producer
+
+class AxualGood(private val producer: Producer<String, String>) {
+    fun publish() {
+        println(producer)
+    }
+}
+        ]]></code>
+    </test-code>
+</test-data>

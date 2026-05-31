@@ -129,6 +129,43 @@ class Foo {
         </example>
     </rule>
 
+    <rule name="AvoidDuplicateAssignmentsInCases"
+          message="Avoid duplicate assignments in different when branches"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodeQuality.md#SSC01">
+        <description>Problem: assigning the same variable to the same value in multiple when branches often indicates a bug.&#13;
+            Solution: use distinct assignments per branch or move common logic outside the when expression. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,suspicious" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//WhenEntry[
+    ControlStructureBody//Assignment[
+        DirectlyAssignableExpression/@Identifier =
+            ancestor::WhenEntry[1]/preceding-sibling::WhenEntry/ControlStructureBody//Assignment/DirectlyAssignableExpression/@Identifier
+        and (
+            .//T-LineStrText/@Text =
+                ancestor::WhenEntry[1]/preceding-sibling::WhenEntry/ControlStructureBody//Assignment//T-LineStrText/@Text
+            or
+            .//LiteralConstant/@Text =
+                ancestor::WhenEntry[1]/preceding-sibling::WhenEntry/ControlStructureBody//Assignment//LiteralConstant/@Text
+        )
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+when (type) {
+    "A" -> result = "same"
+    "B" -> result = "same" // bad
+    else -> result = "other"
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidImplicitlyRecompilingRegex"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
@@ -282,6 +319,38 @@ class AvoidInMemoryStreamingDefaultConstructor {
 }
 ]]>
         </example>
+    </rule>
+
+    <rule name="AvoidInfiniteRecursion"
+          language="kotlin"
+          message="Avoid recursive calls without a proper stop condition."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ipf01">
+        <description>Problem: recursive calls without a clear stop condition can overflow the stack or loop forever.&#13;
+            Solution: add a terminating condition or rewrite as iteration. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PrimaryExpression[@Identifier = ancestor::FunctionDeclaration[1]/@Identifier]
+    and PostfixUnarySuffix/CallSuffix
+    and not(.//NavigationSuffix)
+    and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) =
+        count(ancestor::FunctionDeclaration[1]/FunctionValueParameters//FunctionValueParameter)
+    and not(PostfixUnarySuffix/CallSuffix//AdditiveOperator)
+    and not(PostfixUnarySuffix/CallSuffix//MultiplicativeOperator)
+    and not(ancestor::FunctionDeclaration[1]//IfExpression[.//ComparisonExpression])
+    and not(ancestor::FunctionDeclaration[1]//WhenExpression[.//ComparisonExpression])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun recurse(n: Int) {
+    recurse(n) // bad
+}
+        ]]></example>
     </rule>
 
     <rule name="AvoidLoadingAllFromFile"
@@ -1043,6 +1112,48 @@ fun good(path: Path) = BufferedInputStream(Files.newInputStream(path)).use { it.
         </example>
     </rule>
 
+    <rule name="HashCodeOnlyCallsSuper"
+          language="kotlin"
+          message="hashCode only calls super."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#isio03">
+        <description>Problem: when equals is implemented, hashCode needs a consistent implementation too. If hashCode only calls super.hashCode(), equal objects may behave incorrectly in hash-based collections.&#13;
+            Solution: implement hashCode using the same relevant properties as equals. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="correctness,jpinpoint-rule" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//FunctionDeclaration[
+    @Identifier = 'hashCode'
+    and not(FunctionValueParameters//FunctionValueParameter)
+    and FunctionBody[
+        count(.//NavigationSuffix[@Identifier = 'hashCode']) = 1
+        and .//SuperExpression
+    ]
+][
+    ancestor::ClassBody[1]//FunctionDeclaration[
+        @Identifier = 'equals'
+        and count(FunctionValueParameters//FunctionValueParameter) = 1
+        and not(
+            FunctionBody[
+                count(.//NavigationSuffix[@Identifier = 'equals']) = 1
+                and .//SuperExpression
+            ]
+        )
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad(private val id: String) {
+    override fun equals(other: Any?): Boolean = other is Bad && id == other.id
+    override fun hashCode(): Int = super.hashCode() // bad
+}
+        ]]></example>
+    </rule>
+
     <rule name="ImproperVariableName"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
@@ -1243,6 +1354,98 @@ class GoodKotlinMdc {
             MDC.clear()
         }
     }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="MissingFieldInEquals"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Property assigned from construction is missing in equals method."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodeQuality.md#ieah04">
+        <description>Problem: if a property that participates in object state is omitted from equals, object equality can become inconsistent.&#13;
+            Solution: include all relevant constructed properties in equals and hashCode. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,suspicious" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and @Mutable = false()
+][
+    ancestor::ClassBody[1]//FunctionDeclaration[
+        @Identifier = 'equals'
+        and count(FunctionValueParameters//FunctionValueParameter) = 1
+        and not(FunctionBody//ThrowExpression)
+    ]
+    and not(
+        let $name := VariableDeclaration/@Identifier
+        return ancestor::ClassBody[1]//FunctionDeclaration[
+            @Identifier = 'equals'
+            and count(FunctionValueParameters//FunctionValueParameter) = 1
+        ]/FunctionBody//SimpleIdentifier/T-Identifier[@Text = $name]
+    )
+    and (
+        let $name := VariableDeclaration/@Identifier
+        return
+            ancestor::ClassDeclaration[1]/PrimaryConstructor//ClassParameter[@Identifier = $name]
+            or ancestor::ClassBody[1]//AnonymousInitializer//SimpleIdentifier/T-Identifier[@Text = $name]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad(id: String, name: String) {
+    private val id = id
+    private val name = name // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="MissingFieldInHashCode"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Equals uses a property which is missing in hashCode."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodeQuality.md#ieah03">
+        <description>Problem: using fewer properties in hashCode than in equals can degrade hash-based collection performance and violate expectations.&#13;
+            Solution: use the same relevant properties in equals and hashCode. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+][
+    ancestor::ClassBody[1]//FunctionDeclaration[
+        @Identifier = 'hashCode'
+        and not(FunctionValueParameters//FunctionValueParameter)
+    ]
+    and (
+        let $name := VariableDeclaration/@Identifier
+        return count(
+            ancestor::ClassBody[1]//FunctionDeclaration[
+                @Identifier = 'equals'
+                and count(FunctionValueParameters//FunctionValueParameter) = 1
+            ]/FunctionBody//SimpleIdentifier/T-Identifier[@Text = $name]
+        ) > 0
+        and count(
+            ancestor::ClassBody[1]//FunctionDeclaration[
+                @Identifier = 'hashCode'
+                and not(FunctionValueParameters//FunctionValueParameter)
+            ]/FunctionBody//SimpleIdentifier/T-Identifier[@Text = $name]
+        ) = 0
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad(id: String, name: String) {
+    private val id = id
+    private val name = name // bad
 }
         ]]></example>
     </rule>
@@ -3771,6 +3974,37 @@ class Foo {
         ]]></example>
     </rule>
 
+    <rule name="AxualProducerCreatedForEachMethodCall"
+          message="An Axual (Kafka) producer is created for each method call, which is expensive and takes resources."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ia10">
+        <description>Problem: each Producer takes threads and memory. If you create it in each method call, and call
+            this frequently, it can cause unnecessary resource usage and even OutOfMemoryError.&#13;
+            Solution: share Axual Producer instances as class-level properties or Spring beans. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    pmd-kotlin:isWithin('function-body')
+    and not(pmd-kotlin:isWithin('lambda'))
+    and pmd-kotlin:typeIs('io.axual.client.producer.Producer')
+    and not(ancestor::ClassDeclaration[pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Configuration')])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class AxualBad {
+    fun publish() {
+        val producer: Producer<String, String> = createProducer() // bad
+    }
+}
+        ]]></example>
+    </rule>
+
     <rule name="BufferingClientHttpRequestFactoryIsMemoryGreedy"
           message="BufferingClientHttpRequestFactory buffers entire response bodies in memory and is memory greedy."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
@@ -3867,6 +4101,53 @@ class Foo {
     fun toJson(obj: Any): String {
         return Gson().toJson(obj) // bad
     }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="HttpClientBuilderPoolSettingsIgnored"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="HttpClient builder is used with a ConnectionManager and MaxConn settings on the client are ignored. Remove them."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi09">
+        <description>Problem: when setConnectionManager is used, pool settings must be configured on that connection manager.
+            Client level setMaxConnTotal and setMaxConnPerRoute calls are ignored.&#13;
+            Solution: either configure the pool sizes on the connection manager or omit setConnectionManager and configure
+            the client builder directly. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="correctness,jpinpoint-rule,resilience" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//NavigationSuffix[
+    @Identifier = ('setMaxConnTotal', 'setMaxConnPerRoute')
+    and ancestor::FunctionBody[1][
+        .//PostfixUnaryExpression[
+            .//NavigationSuffix[@Identifier = 'setConnectionManager']
+            and (
+                pmd-kotlin:matchesSig('org.apache.http.impl.client.HttpClientBuilder#setConnectionManager(*)')
+                or pmd-kotlin:matchesSig('org.apache.http.impl.client.HttpClients#setConnectionManager(*)')
+                or pmd-kotlin:matchesSig('org.apache.http.impl.nio.client.HttpAsyncClientBuilder#setConnectionManager(*)')
+                or PostfixUnarySuffix/NavigationSuffix/@Identifier = 'setConnectionManager'
+            )
+        ]
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun bad(poolMgr: PoolingHttpClientConnectionManager) {
+    HttpClientBuilder.create()
+        .setConnectionManager(poolMgr)
+        .setMaxConnTotal(200) // bad, ignored
+        .build()
+}
+
+fun good(poolMgr: PoolingHttpClientConnectionManager) {
+    HttpClientBuilder.create()
+        .setConnectionManager(poolMgr)
+        .build()
 }
         ]]></example>
     </rule>
