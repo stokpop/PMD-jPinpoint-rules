@@ -1043,6 +1043,43 @@ fun good(path: Path) = BufferedInputStream(Files.newInputStream(path)).use { it.
         </example>
     </rule>
 
+    <rule name="ImproperVariableName"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Improper variable name."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#iivn01">
+        <description>Problem: non descriptive variable names such as value, int1, or var1 make code harder to understand.&#13;
+            Solution: use domain specific names that communicate intent. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(
+//VariableDeclaration[
+    matches(@Identifier, '^(VALUE|VAL|INTEGER|INT|LONG|NUMBER|NUM|[0-9]+|ZERO|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|TWENTY|_)+$', 'i')
+    or matches(@Identifier, '^var[0-9]+$')
+]
+|
+//FunctionValueParameter/Parameter[
+    matches(@Identifier, '^(VALUE|VAL|INTEGER|INT|LONG|NUMBER|NUM|[0-9]+|ZERO|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|TWENTY|_)+$', 'i')
+    or matches(@Identifier, '^var[0-9]+$')
+]
+)
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class BadNames {
+    val value: Int = 0 // bad
+
+    fun process(var1: String) {} // bad
+
+    val connectionTimeout: Int = 5000 // good
+}
+        ]]></example>
+    </rule>
+
     <rule name="InitializeComparatorOnlyOnce"
           message="A Comparator is initialized inside a method or lambda; initialize it once as a shared field."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
@@ -1210,6 +1247,74 @@ class GoodKotlinMdc {
         ]]></example>
     </rule>
 
+    <rule name="NonComparableMapKeys"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Map uses a non comparable key type."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#inck01">
+        <description>Problem: map declarations with non comparable key types often lead to inefficient or unclear key handling.&#13;
+            Solution: prefer comparable key types, or use a TreeMap with an explicit comparator. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier = ('Map', 'HashMap', 'LinkedHashMap', 'MutableMap')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]
+        [not(@Identifier = ('String', 'Int', 'Long', 'Short', 'Byte', 'Double', 'Float', 'Char', 'Boolean', 'UInt', 'ULong', 'UShort', 'UByte', 'BigDecimal', 'BigInteger', 'UUID', 'Comparable'))]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.HashMap
+
+class BadMapKeys {
+    val map: Map<BadKey, String> = HashMap() // bad
+}
+
+class BadKey
+        ]]></example>
+    </rule>
+
+    <rule name="NonComparableSetElements"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Set uses a non comparable element type."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#inck02">
+        <description>Problem: set lookups on non comparable element types can be unclear and error prone.&#13;
+            Solution: use comparable element types, or use an ordered set with an explicit comparator. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier = ('Set', 'HashSet', 'MutableSet')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]
+        [not(@Identifier = ('String', 'Int', 'Long', 'Short', 'Byte', 'Double', 'Float', 'Char', 'Boolean', 'UInt', 'ULong', 'UShort', 'UByte', 'BigDecimal', 'BigInteger', 'UUID', 'Comparable'))]
+    and VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/@Identifier = ('contains', 'containsAll', 'remove', 'removeAll', 'retainAll')
+    ]/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.HashSet
+
+class BadSetElements {
+    fun bad(elem: BadElement): Boolean {
+        val values: HashSet<BadElement> = HashSet() // bad
+        return values.contains(elem)
+    }
+}
+
+class BadElement
+        ]]></example>
+    </rule>
+
     <rule name="UnconditionalConcatInLogArgument"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
@@ -1325,6 +1430,66 @@ import com.missing.dependency.SomeClass // bad - 'SomeClass' dependency not on c
 import java.util.List // good - java.util is always available
             ]]>
         </example>
+    </rule>
+
+    <rule name="UsingSuppressWarnings"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Audit uses of suppression annotations."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#isw01">
+        <description>Problem: suppressing warnings can hide issues that should be reviewed explicitly.&#13;
+            Solution: audit suppression annotations and narrow them where possible. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//StringLiteral[
+    ancestor::Annotation
+    and LineStringLiteral/LineStringContent/T-LineStrText[
+        matches(@Text, $ruleIdMatches)
+        and not(matches(@Text, $ruleIdNotMatches))
+    ]
+]
+                ]]></value>
+            </property>
+            <property name="ruleIdMatches" type="String" value=".*" description="Regex for inclusion of rules"/>
+            <property name="ruleIdNotMatches" type="String" value="^$" description="Regex for exclusion of rules"/>
+        </properties>
+        <example><![CDATA[
+@Suppress("PMD.UnconditionalCreatedLogArguments") // bad
+fun process() {}
+        ]]></example>
+    </rule>
+
+    <rule name="UsingSuppressWarningsHighRisk"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Audit uses of high risk suppression annotations."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#isw01">
+        <description>Problem: suppressing high risk rules can hide concurrency or shared state defects.&#13;
+            Solution: review and remove these suppressions whenever possible. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//StringLiteral[
+    ancestor::Annotation
+    and LineStringLiteral/LineStringContent/T-LineStrText[
+        matches(@Text, $ruleIdMatches)
+        and not(matches(@Text, $ruleIdNotMatches))
+    ]
+]
+                ]]></value>
+            </property>
+            <property name="ruleIdMatches" type="String" value="AvoidUserDataInSharedObjects|AvoidUnguardedMutableFieldsInSharedObjects|AvoidUnguardedAssignmentToNonFinalFieldsInSharedObjects|AvoidMutableStaticFields|[^\w]ALL[^\w]|[^\w]all[^\w]|PMD[^\.]|pmd[^:]" description="Regex for inclusion of high risk rules"/>
+            <property name="ruleIdNotMatches" type="String" value="^$" description="Regex for exclusion of high risk rules"/>
+        </properties>
+        <example><![CDATA[
+@Suppress("AvoidMutableStaticFields") // bad
+fun process() {}
+        ]]></example>
     </rule>
 
 <!-- END Included file 'common.xml' -->
@@ -3201,6 +3366,43 @@ import org.apache.hc.client5.http.classic.HttpClient // good
         </example>
     </rule>
 
+    <rule name="AvoidDiscardingHttpClientConfig"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid discarding the HttpClient configuration passed to HttpComponentsClientHttpRequestFactory."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#idhc06">
+        <description>Problem: replacing a constructor supplied HttpClient discards configuration already attached to the request factory.&#13;
+            Solution: either configure the client before construction or use the no arg constructor before calling setHttpClient. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.springframework.http.client.HttpComponentsClientHttpRequestFactory#setHttpClient(*)')
+    and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = ancestor::FunctionDeclaration[1]//PropertyDeclaration[
+        Expression//PostfixUnaryExpression[
+            PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = 'HttpComponentsClientHttpRequestFactory'
+            and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) > 0
+        ]
+    ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.http.client.HttpClient
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+
+class ClientFactory {
+    fun bad(httpClient: HttpClient, newClient: HttpClient) {
+        val factory = HttpComponentsClientHttpRequestFactory(httpClient)
+        factory.setHttpClient(newClient) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidHardcodedConnectionConfig"
           message="Avoid hardcoded connection configuration."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
@@ -3495,6 +3697,38 @@ class Good {
 }
         ]]>
         </example>
+    </rule>
+
+    <rule name="AvoidUnclearHttpRouteSecurity"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid unclear HttpRoute security configuration."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#irs04">
+        <description>Problem: HttpRoute constructors with only host or host plus local address leave secure routing intent unclear.&#13;
+            Solution: use a constructor that explicitly sets the secure flag. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (
+        pmd-kotlin:matchesSig('org.apache.http.conn.routing.HttpRoute#<init>(*)')
+        or pmd-kotlin:matchesSig('org.apache.hc.client5.http.HttpRoute#<init>(*)')
+    )
+    and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) <= 2
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.http.HttpHost
+import org.apache.http.conn.routing.HttpRoute
+
+class RouteFactory {
+    fun bad(): HttpRoute = HttpRoute(HttpHost("example.com")) // bad
+}
+        ]]></example>
     </rule>
 
     <rule name="AvoidXMLGregorianCalendar"

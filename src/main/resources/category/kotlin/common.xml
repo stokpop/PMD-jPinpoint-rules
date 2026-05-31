@@ -1315,4 +1315,169 @@ class Foo {
 }
         ]]></example>
     </rule>
+
+    <rule name="ImproperVariableName"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Improper variable name."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iivn01">
+        <description>Problem: non descriptive variable names such as value, int1, or var1 make code harder to understand.&#13;
+            Solution: use domain specific names that communicate intent. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(
+//VariableDeclaration[
+    matches(@Identifier, '^(VALUE|VAL|INTEGER|INT|LONG|NUMBER|NUM|[0-9]+|ZERO|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|TWENTY|_)+$', 'i')
+    or matches(@Identifier, '^var[0-9]+$')
+]
+|
+//FunctionValueParameter/Parameter[
+    matches(@Identifier, '^(VALUE|VAL|INTEGER|INT|LONG|NUMBER|NUM|[0-9]+|ZERO|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|TWENTY|_)+$', 'i')
+    or matches(@Identifier, '^var[0-9]+$')
+]
+)
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class BadNames {
+    val value: Int = 0 // bad
+
+    fun process(var1: String) {} // bad
+
+    val connectionTimeout: Int = 5000 // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="UsingSuppressWarnings"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Audit uses of suppression annotations."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isw01">
+        <description>Problem: suppressing warnings can hide issues that should be reviewed explicitly.&#13;
+            Solution: audit suppression annotations and narrow them where possible. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//StringLiteral[
+    ancestor::Annotation
+    and LineStringLiteral/LineStringContent/T-LineStrText[
+        matches(@Text, $ruleIdMatches)
+        and not(matches(@Text, $ruleIdNotMatches))
+    ]
+]
+                ]]></value>
+            </property>
+            <property name="ruleIdMatches" type="String" value=".*" description="Regex for inclusion of rules"/>
+            <property name="ruleIdNotMatches" type="String" value="^$" description="Regex for exclusion of rules"/>
+        </properties>
+        <example><![CDATA[
+@Suppress("PMD.UnconditionalCreatedLogArguments") // bad
+fun process() {}
+        ]]></example>
+    </rule>
+
+    <rule name="UsingSuppressWarningsHighRisk"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Audit uses of high risk suppression annotations."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isw01">
+        <description>Problem: suppressing high risk rules can hide concurrency or shared state defects.&#13;
+            Solution: review and remove these suppressions whenever possible. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//StringLiteral[
+    ancestor::Annotation
+    and LineStringLiteral/LineStringContent/T-LineStrText[
+        matches(@Text, $ruleIdMatches)
+        and not(matches(@Text, $ruleIdNotMatches))
+    ]
+]
+                ]]></value>
+            </property>
+            <property name="ruleIdMatches" type="String" value="AvoidUserDataInSharedObjects|AvoidUnguardedMutableFieldsInSharedObjects|AvoidUnguardedAssignmentToNonFinalFieldsInSharedObjects|AvoidMutableStaticFields|[^\w]ALL[^\w]|[^\w]all[^\w]|PMD[^\.]|pmd[^:]" description="Regex for inclusion of high risk rules"/>
+            <property name="ruleIdNotMatches" type="String" value="^$" description="Regex for exclusion of high risk rules"/>
+        </properties>
+        <example><![CDATA[
+@Suppress("AvoidMutableStaticFields") // bad
+fun process() {}
+        ]]></example>
+    </rule>
+
+    <rule name="NonComparableMapKeys"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Map uses a non comparable key type."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#inck01">
+        <description>Problem: map declarations with non comparable key types often lead to inefficient or unclear key handling.&#13;
+            Solution: prefer comparable key types, or use a TreeMap with an explicit comparator. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier = ('Map', 'HashMap', 'LinkedHashMap', 'MutableMap')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]
+        [not(@Identifier = ('String', 'Int', 'Long', 'Short', 'Byte', 'Double', 'Float', 'Char', 'Boolean', 'UInt', 'ULong', 'UShort', 'UByte', 'BigDecimal', 'BigInteger', 'UUID', 'Comparable'))]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.HashMap
+
+class BadMapKeys {
+    val map: Map<BadKey, String> = HashMap() // bad
+}
+
+class BadKey
+        ]]></example>
+    </rule>
+
+    <rule name="NonComparableSetElements"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Set uses a non comparable element type."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#inck02">
+        <description>Problem: set lookups on non comparable element types can be unclear and error prone.&#13;
+            Solution: use comparable element types, or use an ordered set with an explicit comparator. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/@Identifier = ('Set', 'HashSet', 'MutableSet')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]
+        [not(@Identifier = ('String', 'Int', 'Long', 'Short', 'Byte', 'Double', 'Float', 'Char', 'Boolean', 'UInt', 'ULong', 'UShort', 'UByte', 'BigDecimal', 'BigInteger', 'UUID', 'Comparable'))]
+    and VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/@Identifier = ('contains', 'containsAll', 'remove', 'removeAll', 'retainAll')
+    ]/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.HashSet
+
+class BadSetElements {
+    fun bad(elem: BadElement): Boolean {
+        val values: HashSet<BadElement> = HashSet() // bad
+        return values.contains(elem)
+    }
+}
+
+class BadElement
+        ]]></example>
+    </rule>
 </ruleset>

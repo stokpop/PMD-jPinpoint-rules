@@ -911,4 +911,73 @@ class ClientFactory {
 }
         ]]></example>
     </rule>
+
+    <rule name="AvoidUnclearHttpRouteSecurity"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid unclear HttpRoute security configuration."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#irs04">
+        <description>Problem: HttpRoute constructors with only host or host plus local address leave secure routing intent unclear.&#13;
+            Solution: use a constructor that explicitly sets the secure flag. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (
+        pmd-kotlin:matchesSig('org.apache.http.conn.routing.HttpRoute#<init>(*)')
+        or pmd-kotlin:matchesSig('org.apache.hc.client5.http.HttpRoute#<init>(*)')
+    )
+    and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) <= 2
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.http.HttpHost
+import org.apache.http.conn.routing.HttpRoute
+
+class RouteFactory {
+    fun bad(): HttpRoute = HttpRoute(HttpHost("example.com")) // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidDiscardingHttpClientConfig"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid discarding the HttpClient configuration passed to HttpComponentsClientHttpRequestFactory."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#idhc06">
+        <description>Problem: replacing a constructor supplied HttpClient discards configuration already attached to the request factory.&#13;
+            Solution: either configure the client before construction or use the no arg constructor before calling setHttpClient. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.springframework.http.client.HttpComponentsClientHttpRequestFactory#setHttpClient(*)')
+    and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = ancestor::FunctionDeclaration[1]//PropertyDeclaration[
+        Expression//PostfixUnaryExpression[
+            PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = 'HttpComponentsClientHttpRequestFactory'
+            and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) > 0
+        ]
+    ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.http.client.HttpClient
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+
+class ClientFactory {
+    fun bad(httpClient: HttpClient, newClient: HttpClient) {
+        val factory = HttpComponentsClientHttpRequestFactory(httpClient)
+        factory.setHttpClient(newClient) // bad
+    }
+}
+        ]]></example>
+    </rule>
 </ruleset>

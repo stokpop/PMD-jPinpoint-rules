@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: replacing constructor supplied http client</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>8</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.client.HttpClient
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+
+class BadFactory {
+    fun bad(httpClient: HttpClient, newClient: HttpClient): HttpClient {
+        val factory = HttpComponentsClientHttpRequestFactory(httpClient)
+        factory.bufferRequestBody = false
+        factory.setHttpClient(newClient)
+        return factory.httpClient
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: no arg constructor followed by setter</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.http.client.HttpClient
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+
+class GoodSetter {
+    fun good(newClient: HttpClient): HttpClient {
+        val factory = HttpComponentsClientHttpRequestFactory()
+        factory.setHttpClient(newClient)
+        return factory.httpClient
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: constructor supplied client is kept</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.http.client.HttpClient
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+
+class GoodConstructorOnly {
+    fun good(httpClient: HttpClient): HttpClient {
+        val factory = HttpComponentsClientHttpRequestFactory(httpClient)
+        return factory.httpClient
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

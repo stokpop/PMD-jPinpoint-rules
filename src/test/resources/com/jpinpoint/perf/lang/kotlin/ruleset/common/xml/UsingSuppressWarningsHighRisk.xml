@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: suppresses high risk rule</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class BadHighRiskRule {
+    @Suppress("AvoidMutableStaticFields")
+    fun process() {}
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: suppresses pmd prefix without dot</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class BadPmdPrefix {
+    @Suppress("PMDall")
+    fun process() {}
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: regular pmd rule id</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodSpecificRule {
+    @Suppress("PMD.AvoidCalendar")
+    fun process() {}
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: unrelated suppress id</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodUnusedVariable {
+    @Suppress("UNUSED_VARIABLE")
+    fun process() {}
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

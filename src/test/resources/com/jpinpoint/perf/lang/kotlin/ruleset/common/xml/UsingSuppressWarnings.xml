@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: kotlin suppress on function</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class BadSuppress {
+    @Suppress("PMD.UnconditionalCreatedLogArguments")
+    fun process() {}
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: java suppress warnings on class</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>1</expected-linenumbers>
+        <code><![CDATA[
+@SuppressWarnings("UNUSED_VARIABLE")
+class BadJavaSuppress
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: no suppression annotation</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodNoSuppress {
+    val x = 1
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
