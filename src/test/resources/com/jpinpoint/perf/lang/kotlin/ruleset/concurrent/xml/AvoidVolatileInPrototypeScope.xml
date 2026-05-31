@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: volatile property in prototype scope</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Component
+
+@Scope("prototype")
+@Component
+class Foo {
+    @Volatile var counter = 0
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: volatile property in singleton scope</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Component
+
+@Scope("singleton")
+@Component
+class Foo {
+    @Volatile var counter = 0
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: volatile property without scope</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+
+@Component
+class Foo {
+    @Volatile var counter = 0
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: atomic counter in prototype scope</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.concurrent.atomic.AtomicInteger
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Component
+
+@Scope("prototype")
+@Component
+class Foo {
+    val counter = AtomicInteger(0)
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

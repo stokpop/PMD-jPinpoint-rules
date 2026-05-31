@@ -879,4 +879,36 @@ class GoodConnectionConfig {
 }
         ]]></example>
     </rule>
+    <rule name="UseCloseableForHttpClient"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="HttpClient is used instead of ClosableHttpClient. "
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#idhc05">
+        <description>Problem: if HttpClient connections are not closed properly, resources are not released.
+            Solution: use a closeable client in a use block, or hand it to HttpComponentsClientHttpRequestFactory. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:typeIs('org.apache.http.client.HttpClient')
+     or pmd-kotlin:typeIs('org.apache.http.impl.client.CloseableHttpClient'))
+    and pmd-kotlin:isWithin('function-body')
+    and not(ancestor-or-self::PostfixUnaryExpression[PostfixUnarySuffix/NavigationSuffix/@Identifier='use'])
+    and not(ancestor::FunctionBody[.//PrimaryExpression[@Identifier='HttpComponentsClientHttpRequestFactory']])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.http.impl.client.HttpClientBuilder
+
+class ClientFactory {
+    fun bad() {
+        val client = HttpClientBuilder.create().build() // bad
+    }
+}
+        ]]></example>
+    </rule>
 </ruleset>

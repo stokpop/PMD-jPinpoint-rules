@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: mutable list property</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class Foo {
+    var items: MutableList<String> = mutableListOf()
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: array list property</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class Foo {
+    var list: ArrayList<Int> = ArrayList()
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: immutable list val</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Foo {
+    val items: List<String> = listOf()
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: empty list val</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Foo {
+    val items: List<String> = emptyList()
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: jpa one to many</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import jakarta.persistence.OneToMany
+
+class Foo {
+    @OneToMany
+    var items: MutableList<String> = mutableListOf()
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

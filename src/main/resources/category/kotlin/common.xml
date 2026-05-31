@@ -1209,4 +1209,110 @@ class Good {
 }
         ]]></example>
     </rule>
+    <rule name="UnconditionalOperationOnLogArgument"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Operation is executed regardless of log level and can be expensive"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ilo05">
+        <description>Problem: obj.toString() is executed regardless of log level for direct SLF4J trace/debug/info calls.
+            Solution: pass the object directly with SLF4J placeholders or use a lazy logging API. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.slf4j.Logger#trace(*)')
+    or pmd-kotlin:matchesSig('org.slf4j.Logger#debug(*)')
+    or pmd-kotlin:matchesSig('org.slf4j.Logger#info(*)')
+]
+[.//PostfixUnaryExpression[
+    PostfixUnarySuffix/NavigationSuffix/@Identifier = 'toString'
+    and not(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument)
+]]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad(obj: Any) {
+        log.debug(obj.toString()) // bad
+    }
+
+    fun good(obj: Any) {
+        log.debug("{}", obj) // good
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidUnnecessaryStringBuilderCreation"
+          language="kotlin"
+          message="Use concatenation (+) instead of new StringBuilder if only one statement."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isc05">
+        <description>Problem: Creating a StringBuilder and using append in one chained statement is more verbose than direct concatenation or a Kotlin string template.
+            Solution: use concatenation or string templates for one-off expressions. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:isWithin('function-body')
+    and PostfixUnarySuffix/NavigationSuffix/@Identifier = 'toString'
+    and .//PostfixUnarySuffix/NavigationSuffix/@Identifier = 'append'
+    and .//PrimaryExpression[@Identifier='StringBuilder']
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Greeter {
+    fun bad(name: String): String {
+        return StringBuilder().append("hello").append(name).toString() // bad
+    }
+
+    fun good(name: String): String {
+        return "hello$name" // good
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidMutableLists"
+          language="kotlin"
+          message="List is mutable; prefer val with an immutable List."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iml01">
+        <description>Problem: mutable list properties are easier to modify accidentally and are less safe to share.
+            Solution: prefer val with List/listOf/emptyList, except for persistence and configuration special cases. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and @Mutable = true()
+    and (
+        pmd-kotlin:typeIs('java.util.ArrayList')
+        or pmd-kotlin:typeIs('kotlin.collections.MutableList')
+    )
+    and not(pmd-kotlin:hasAnnotation('OneToMany'))
+    and not(pmd-kotlin:hasAnnotation('ManyToMany'))
+    and not(ancestor::ClassDeclaration[pmd-kotlin:hasAnnotation('ConfigurationProperties')])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Foo {
+    var items: MutableList<String> = mutableListOf() // bad
+    val names: List<String> = emptyList() // good
+}
+        ]]></example>
+    </rule>
 </ruleset>

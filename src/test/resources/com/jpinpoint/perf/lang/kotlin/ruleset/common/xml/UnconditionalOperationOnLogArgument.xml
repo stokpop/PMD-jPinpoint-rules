@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: debug obj toString</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad(obj: Any) {
+        log.debug(obj.toString())
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: trace nested toString</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class User(val name: Any)
+class LoggingService(private val log: Logger) {
+    fun bad(user: User) {
+        log.trace(user.name.toString())
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: slf4j placeholder</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun good(obj: Any) {
+        log.debug("{}", obj)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: info placeholder</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun good(item: Any) {
+        log.info("Processing {}", item)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: lazy lambda logger</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class KotlinLogger {
+    fun debug(message: () -> String) = message()
+}
+
+class LoggingService(private val logger: KotlinLogger) {
+    fun good(obj: Any) {
+        logger.debug { "Processing: $obj" }
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

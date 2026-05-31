@@ -4,65 +4,52 @@
            xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
 
     <test-code>
-        <description>bad: companion object var counter</description>
+        <description>bad: chained string builder append toString</description>
         <expected-problems>1</expected-problems>
         <expected-linenumbers>3</expected-linenumbers>
         <code><![CDATA[
-class CounterStore {
-    companion object {
-        var counter = 0
+class Greeter {
+    fun bad(name: String): String {
+        return StringBuilder().append("hello").append(name).toString()
     }
 }
         ]]></code>
     </test-code>
 
     <test-code>
-        <description>bad: companion object mutable list var</description>
+        <description>bad: constructor arg string builder chain</description>
         <expected-problems>1</expected-problems>
         <expected-linenumbers>3</expected-linenumbers>
         <code><![CDATA[
-class Cache {
-    companion object {
-        var instances: MutableList<String> = mutableListOf()
+class Greeter {
+    fun bad(user: Any): String {
+        return StringBuilder("Hello ").append(user).toString()
     }
 }
         ]]></code>
     </test-code>
 
     <test-code>
-        <description>good: volatile companion var</description>
+        <description>good: string template</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
-class GoodVolatile {
-    companion object {
-        @Volatile
-        var counter = 0
+class Greeter {
+    fun good(name: String): String {
+        return "hello$name"
     }
 }
         ]]></code>
     </test-code>
 
     <test-code>
-        <description>good: immutable companion val</description>
+        <description>good: separate statements</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
-class Constants {
-    companion object {
-        val CONSTANT = "fixed"
-    }
-}
-        ]]></code>
-    </test-code>
-
-    <test-code>
-        <description>good: atomic val in companion object</description>
-        <expected-problems>0</expected-problems>
-        <code><![CDATA[
-import java.util.concurrent.atomic.AtomicInteger
-
-class AtomicCounter {
-    companion object {
-        val counter = AtomicInteger(0)
+class Greeter {
+    fun good(): String {
+        val sb = StringBuilder()
+        sb.append("x")
+        return sb.toString()
     }
 }
         ]]></code>

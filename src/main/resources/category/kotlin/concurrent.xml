@@ -1229,7 +1229,7 @@ class Bad {
           message="Avoid mutable static fields. Make val (immutable) or use thread-safe access with @Volatile or @GuardedBy."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
-          externalInfoUrl="${doc_root}/JavaCodePerformance.md#tutc08">
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isc01">
         <description>Problem: Multiple threads typically access static fields. Unguarded assignment to a mutable or non-final static field is thread-unsafe and may cause corruption or visibility problems. To make this thread-safe, that is, guard the field e.g. with synchronized methods, may cause contention.
             Solution: Make the fields final and unmodifiable. If they really need to be mutable, make access thread-safe: use synchronized and @GuardedBy, use volatile or a suitable concurrent collection type. Consider lock contention.
             (jpinpoint-rules)</description>
@@ -1238,11 +1238,11 @@ class Bad {
             <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
             <property name="xpath">
                 <value><![CDATA[
-//PropertyDeclaration[
-    @Mutable = true()
-    and (pmd-kotlin:isWithin('companion-object') or pmd-kotlin:isWithin('object-declaration'))
-    and not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
-    and not(pmd-kotlin:hasAnnotation('Volatile') or pmd-kotlin:hasAnnotation('GuardedBy'))
+//CompanionObject//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and @Mutable = true()
+    and not(pmd-kotlin:hasAnnotation('Volatile'))
+    and not(pmd-kotlin:hasAnnotation('GuardedBy'))
 ]
                 ]]></value>
             </property>
@@ -1737,6 +1737,85 @@ import org.springframework.stereotype.Service
 @Service
 class OrderService {
     var orderId: String = "" // bad
+}
+        ]]></example>
+    </rule>
+    <rule name="AvoidVolatileInPrototypeScope"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="No need for volatile in prototype scope"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ivps01">
+        <description>A property is defined as volatile while the class has prototype scope. Problem: volatile has overhead while prototype-scoped beans are not shared.
+            Solution: remove volatile and use normal state, or an atomic type if needed. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="confusing,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    pmd-kotlin:hasAnnotation('Volatile')
+    and ancestor::ClassDeclaration[
+        .//Annotation//T-Identifier[@Text='Scope']
+        and (
+            .//Annotation//T-LineStrText[@Text='prototype']
+            or .//Annotation//T-Identifier[@Text='SCOPE_PROTOTYPE']
+        )
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Component
+
+@Scope("prototype")
+@Component
+class Bad {
+    @Volatile var counter = 0 // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidMutableCollectionInParallelStreamForEach"
+          message="Avoid using a mutable collection in a parallel stream forEach, it is a concurrency bug."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#imc01">
+        <description>Problem: mutating a thread-unsafe collection from a parallel stream forEach can corrupt state.
+            Solution: avoid side effects in parallel streams and collect immutable results instead. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.stream.BaseStream#forEach(*)')
+    and (
+        pmd-kotlin:matchesSig('java.util.Collection#parallelStream()')
+        or pmd-kotlin:matchesSig('java.util.stream.BaseStream#parallel()')
+    )
+    and .//LambdaLiteral//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/@Identifier = ('add', 'addAll', 'remove', 'removeAll', 'put', 'putAll')
+        and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+            ancestor::FunctionBody[1]//PropertyDeclaration[
+                pmd-kotlin:typeIs('java.util.ArrayList')
+                or pmd-kotlin:typeIs('java.util.HashMap')
+                or pmd-kotlin:typeIs('java.util.HashSet')
+                or pmd-kotlin:typeIs('java.util.LinkedList')
+                or pmd-kotlin:typeIs('kotlin.collections.MutableList')
+            ]/VariableDeclaration/@Identifier
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class ParallelCollector {
+    fun bad(list: List<String>) {
+        val results = ArrayList<String>()
+        list.parallelStream().forEach { results.add(it.uppercase()) } // bad
+    }
 }
         ]]></example>
     </rule>

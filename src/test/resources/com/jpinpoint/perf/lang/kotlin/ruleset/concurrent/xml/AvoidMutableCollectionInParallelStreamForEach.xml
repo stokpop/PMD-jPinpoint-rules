@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: parallel stream mutates array list</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+class ParallelCollector {
+    fun bad(list: List<String>) {
+        val inUpperCase = ArrayList<String>()
+        list.parallelStream().forEach { inUpperCase.add(it.uppercase()) }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: parallel stream mutates mutable list</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+class ParallelCollector {
+    fun bad(list: List<String>) {
+        val results = mutableListOf<String>()
+        list.stream().parallel().forEach { results.add(it) }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: map and toList</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class ParallelCollector {
+    fun good(list: List<String>): List<String> {
+        return list.parallelStream().map { it.uppercase() }.toList()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: parallel forEach without mutable collection access</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class ParallelCollector {
+    fun good(list: List<String>) {
+        list.parallelStream().forEach { println(it) }
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
