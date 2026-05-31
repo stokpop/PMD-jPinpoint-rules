@@ -11,7 +11,7 @@
 import java.io.FileInputStream
 
 fun bad(name: String): ByteArray =
-    FileInputStream(name).use { it.readBytes() } // bad
+    FileInputStream(name).use { it.readBytes() } // bad: unbuffered
         ]]></code>
     </test-code>
 
@@ -23,7 +23,21 @@ fun bad(name: String): ByteArray =
 import java.io.FileOutputStream
 
 fun bad(name: String, data: ByteArray) =
-    FileOutputStream(name).use { it.write(data) } // bad
+    FileOutputStream(name).use { it.write(data) } // bad: unbuffered
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: FileInputStream assigned and used without buffering</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.io.FileInputStream
+
+fun bad(name: String): ByteArray {
+    val bytes: ByteArray
+    return FileInputStream(name).use { it.readBytes() } // bad
+}
         ]]></code>
     </test-code>
 
@@ -48,6 +62,18 @@ import java.io.FileOutputStream
 
 fun good(name: String, data: ByteArray) =
     BufferedOutputStream(FileOutputStream(name)).use { it.write(data) }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: Files.newInputStream used (buffered by default)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.nio.file.Files
+import java.nio.file.Paths
+
+fun good(name: String): ByteArray =
+    Files.newInputStream(Paths.get(name)).use { it.readBytes() }
         ]]></code>
     </test-code>
 

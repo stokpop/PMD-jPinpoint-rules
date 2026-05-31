@@ -4,7 +4,7 @@
            xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
 
     <test-code>
-        <description>bad: BufferingClientHttpRequestFactory created</description>
+        <description>bad: BufferingClientHttpRequestFactory in class property</description>
         <expected-problems>1</expected-problems>
         <expected-linenumbers>5</expected-linenumbers>
         <code><![CDATA[
@@ -18,21 +18,34 @@ class Bad(delegate: ClientHttpRequestFactory) {
     </test-code>
 
     <test-code>
-        <description>bad: BufferingClientHttpRequestFactory created in function</description>
+        <description>bad: BufferingClientHttpRequestFactory in function, single-expression</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>5</expected-linenumbers>
+        <expected-linenumbers>4</expected-linenumbers>
         <code><![CDATA[
 import org.springframework.http.client.BufferingClientHttpRequestFactory
 import org.springframework.http.client.ClientHttpRequestFactory
 
-fun createFactory(delegate: ClientHttpRequestFactory): BufferingClientHttpRequestFactory {
-    return BufferingClientHttpRequestFactory(delegate) // bad
-}
+fun wrap(delegate: ClientHttpRequestFactory) = BufferingClientHttpRequestFactory(delegate) // bad
         ]]></code>
     </test-code>
 
     <test-code>
-        <description>good: plain ClientHttpRequestFactory used</description>
+        <description>bad: BufferingClientHttpRequestFactory created in lambda</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.http.client.BufferingClientHttpRequestFactory
+import org.springframework.http.client.ClientHttpRequestFactory
+
+fun wrapAll(delegates: List<ClientHttpRequestFactory>) =
+    delegates.map {
+        BufferingClientHttpRequestFactory(it) // bad - created per element
+    }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: plain ClientHttpRequestFactory used, no buffering</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
 import org.springframework.http.client.ClientHttpRequestFactory

@@ -4,15 +4,42 @@
            xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
 
     <test-code>
-        <description>bad: HttpHost with only hostname</description>
+        <description>bad: HttpHost with only hostname in function body</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>4</expected-linenumbers>
+        <expected-linenumbers>5</expected-linenumbers>
         <code><![CDATA[
 import org.apache.http.HttpHost
 
 class Bad {
-    val host = HttpHost("hostname") // bad
+    fun createHost(name: String): HttpHost {
+        return HttpHost(name) // bad: default port -1, no protocol
+    }
 }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: HttpHost with only hostname as top-level function single-expression</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.HttpHost
+
+fun createHost(name: String) = HttpHost(name) // bad
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: HttpHost with only hostname in lambda</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.HttpHost
+
+fun createHosts(names: List<String>): List<HttpHost> =
+    names.map {
+        HttpHost(it) // bad: created per element without port/protocol
+    }
         ]]></code>
     </test-code>
 
@@ -22,9 +49,7 @@ class Bad {
         <code><![CDATA[
 import org.apache.http.HttpHost
 
-class Good {
-    val host = HttpHost("hostname", 443)
-}
+fun createHost(name: String) = HttpHost(name, 443)
         ]]></code>
     </test-code>
 
@@ -34,9 +59,8 @@ class Good {
         <code><![CDATA[
 import org.apache.http.HttpHost
 
-class Good2 {
-    val host = HttpHost("hostname", 443, "https")
-}
+fun createHosts(names: List<String>): List<HttpHost> =
+    names.map { HttpHost(it, 443, "https") }
         ]]></code>
     </test-code>
 

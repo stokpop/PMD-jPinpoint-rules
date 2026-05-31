@@ -12,7 +12,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class Bad {
     companion object {
-        val dbFactory: DocumentBuilderFactory = DocumentBuilderFactory.newInstance() // bad
+        val dbFactory: DocumentBuilderFactory = DocumentBuilderFactory.newInstance() // bad: not thread-safe
     }
 }
         ]]></code>
@@ -50,10 +50,34 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class Good {
     fun parse(xml: String) {
-        val dbFactory = DocumentBuilderFactory.newInstance() // ok: local variable
+        val dbFactory = DocumentBuilderFactory.newInstance() // ok: local, thread-safe
         val db = dbFactory.newDocumentBuilder()
     }
 }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: DocumentBuilderFactory in single-expression top-level function</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.parsers.DocumentBuilderFactory
+
+fun parseXml(xml: String) =
+    DocumentBuilderFactory.newInstance().newDocumentBuilder() // ok: local usage
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: SAXParserFactory created in lambda</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.parsers.SAXParserFactory
+
+fun parseAll(xmlList: List<String>) =
+    xmlList.map {
+        SAXParserFactory.newInstance().newSAXParser() // ok: local per invocation
+    }
         ]]></code>
     </test-code>
 

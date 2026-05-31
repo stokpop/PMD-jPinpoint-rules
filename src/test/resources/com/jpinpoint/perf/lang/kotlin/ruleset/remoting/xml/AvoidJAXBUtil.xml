@@ -4,7 +4,7 @@
            xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
 
     <test-code>
-        <description>bad: JAXB.unmarshal (javax)</description>
+        <description>bad: JAXB.unmarshal in function body (javax)</description>
         <expected-problems>1</expected-problems>
         <expected-linenumbers>5</expected-linenumbers>
         <code><![CDATA[
@@ -18,30 +18,43 @@ class Bad {
     </test-code>
 
     <test-code>
-        <description>bad: JAXB.marshal (javax)</description>
+        <description>bad: JAXB.marshal in top-level function (javax)</description>
         <expected-problems>1</expected-problems>
-        <expected-linenumbers>5</expected-linenumbers>
+        <expected-linenumbers>4</expected-linenumbers>
         <code><![CDATA[
 import javax.xml.bind.JAXB
 import java.io.StringWriter
 
-class Bad2 {
-    fun marshal(obj: Any, sw: StringWriter) = JAXB.marshal(obj, sw) // bad
-}
+fun marshal(obj: Any): String = StringWriter().also { JAXB.marshal(obj, it) }.toString() // bad
         ]]></code>
     </test-code>
 
     <test-code>
-        <description>good: JAXB API used directly via JAXBContext</description>
+        <description>bad: JAXB.unmarshal in lambda (javax)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.bind.JAXB
+import javax.xml.transform.Source
+
+fun <T> unmarshalAll(sources: List<Source>, clazz: Class<T>): List<T> =
+    sources.map {
+        JAXB.unmarshal(it, clazz) // bad - recreates JAXBContext per call
+    }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: JAXBContext created and cached, reused for unmarshalling</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
 import javax.xml.bind.JAXBContext
 
-class Good {
-    fun <T> unmarshal(src: javax.xml.transform.Source, clazz: Class<T>): T {
-        val ctx = JAXBContext.newInstance(clazz)
-        return ctx.createUnmarshaller().unmarshal(src) as T
-    }
+class Good<T>(clazz: Class<T>) {
+    private val ctx = JAXBContext.newInstance(clazz) // ok: created once
+
+    fun unmarshal(src: javax.xml.transform.Source): T =
+        ctx.createUnmarshaller().unmarshal(src) as T
 }
         ]]></code>
     </test-code>

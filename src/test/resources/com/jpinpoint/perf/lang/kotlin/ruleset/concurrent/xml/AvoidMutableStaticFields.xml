@@ -10,7 +10,7 @@
         <code><![CDATA[
 class Bad {
     companion object {
-        var count: Int = 0 // bad: mutable static field, not thread-safe
+        var count: Int = 0 // bad: mutable static, not thread-safe
     }
 }
         ]]></code>
@@ -28,12 +28,26 @@ object Counter {
     </test-code>
 
     <test-code>
-        <description>good: val in companion object (immutable)</description>
+        <description>bad: mutable list in companion object</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class Cache {
+    companion object {
+        var items: MutableList<String> = mutableListOf() // bad
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: val (immutable) in companion object</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
 class Good {
     companion object {
         val MAX: Int = 100 // ok: immutable
+        val ITEMS: List<String> = listOf("a", "b") // ok: immutable
     }
 }
         ]]></code>
@@ -53,14 +67,28 @@ class GoodVolatile {
     </test-code>
 
     <test-code>
-        <description>good: mutable local var in function (not static)</description>
+        <description>good: mutable local var in function (not static scope)</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
 class GoodLocal {
     fun doWork() {
-        var count = 0 // ok: local variable
+        var count = 0 // ok: local variable, not shared
         count++
     }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: mutable var in lambda (not static scope)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodLambda {
+    fun process(items: List<String>): List<Int> =
+        items.map {
+            var len = it.length // ok: local to lambda
+            len
+        }
 }
         ]]></code>
     </test-code>
