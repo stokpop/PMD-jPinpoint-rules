@@ -22,7 +22,7 @@
 |
 (: property/field with XMLGregorianCalendar declared type (name-based: distinctive class name) :)
 //PropertyDeclaration[
-    not(ancestor::FunctionBody)
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
     and .//T-Identifier[@Text='XMLGregorianCalendar']
 ]
 |
@@ -60,7 +60,7 @@ class Foo {
                 <value><![CDATA[
 (: requires type info: kotlin-type-mapper auxClasspath :)
 //PropertyDeclaration[
-    not(ancestor::FunctionBody)
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
     and (
         pmd-kotlin:typeIs('com.fasterxml.jackson.databind.ObjectMapper')
         or Expression//PrimaryExpression[

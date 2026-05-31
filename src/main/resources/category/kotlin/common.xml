@@ -99,7 +99,7 @@ class AvoidStringBuffer {
 (: requires type info on the declaration or initializer expression :)
 (: also match when declared type is a supertype (e.g. val x: NumberFormat = DecimalFormat(...)) :)
 //PropertyDeclaration[
-    not(ancestor::FunctionBody)
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
     and (
         pmd-kotlin:typeIs('java.text.DecimalFormat') or pmd-kotlin:typeIs('java.text.ChoiceFormat')
         or Expression//PrimaryExpression[
