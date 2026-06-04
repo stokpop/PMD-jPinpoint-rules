@@ -150,8 +150,8 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
   (: exclude request/prototype scope — not shared :)
   and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
   (: exclude @Scope("request") or @Scope("prototype") :)
-  and not(.//Annotation//T-Identifier[@Text='Scope']
-      and .//Annotation//T-LineStrText[@Text='request' or @Text='prototype'])
+  and not(.//Annotation[pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Scope')]
+      //T-LineStrText[@Text='request' or @Text='prototype'])
   (: exclude @NotThreadSafe :)
   and not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
   (: exclude @ConfigurationProperties :)
@@ -274,8 +274,8 @@ class MyService {
   (: exclude request/prototype scope — not shared :)
   and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
   (: exclude @Scope("request") or @Scope("prototype") :)
-  and not(.//Annotation//T-Identifier[@Text='Scope']
-      and .//Annotation//T-LineStrText[@Text='request' or @Text='prototype'])
+  and not(.//Annotation[pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Scope')]
+      //T-LineStrText[@Text='request' or @Text='prototype'])
   (: exclude @NotThreadSafe :)
   and not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
 ]

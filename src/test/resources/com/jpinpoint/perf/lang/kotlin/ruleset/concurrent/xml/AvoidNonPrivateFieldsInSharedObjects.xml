@@ -176,4 +176,21 @@ class PrototypeBean {
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>violation: @Scope with non-request value and unrelated annotation with "request" string — false negative with text-based @Scope check</description>
+        <expected-problems>1</expected-problems>
+        <code><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Service
+import org.springframework.web.bind.annotation.RequestMapping
+
+@Service
+@Scope("production")
+@RequestMapping("request")
+class ProductionScopedService {
+    var notPrivate: String = "" // bad: non-private field in shared singleton
+}
+        ]]></code>
+    </test-code>
+
 </test-data>
