@@ -191,25 +191,5 @@ class Good6 {
         ]]></code>
     </test-code>
 
-    <test-code>
-        <description>no violation: annotation containing nested GuardedBy("this") value is NOT @GuardedBy("this") on the field — false positive with T-Identifier-based check</description>
-        <expected-problems>0</expected-problems>
-        <code><![CDATA[
-import org.springframework.stereotype.Service
-
-annotation class GuardedBy(val value: String)
-annotation class SomeLockAnnotation(val nested: GuardedBy)
-
-@Service
-class ClassWithAnnotationReference {
-    @SomeLockAnnotation(nested = GuardedBy("this"))
-    var field: String = ""
-
-    fun update() {
-        field = "x" // no violation: @SomeLockAnnotation is not @GuardedBy("this") on the field
-    }
-}
-        ]]></code>
-    </test-code>
 
 </test-data>

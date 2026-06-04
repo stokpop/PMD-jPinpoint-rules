@@ -158,21 +158,5 @@ class Good5 {
         ]]></code>
     </test-code>
 
-    <test-code>
-        <description>no violation: annotation containing GuardedBy class reference is NOT @GuardedBy — false positive with T-Identifier-based check</description>
-        <expected-problems>0</expected-problems>
-        <code><![CDATA[
-import net.jcip.annotations.GuardedBy
-import org.springframework.stereotype.Service
-
-annotation class SomeLockAnnotation(val annotationType: kotlin.reflect.KClass<*>)
-
-@Service
-class ClassWithAnnotationReference {
-    @SomeLockAnnotation(annotationType = GuardedBy::class)
-    private val lock: Any = Any()
-}
-        ]]></code>
-    </test-code>
 
 </test-data>

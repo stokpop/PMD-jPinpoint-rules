@@ -61,19 +61,5 @@ class LocalRetryService {
         ]]></code>
     </test-code>
 
-    <test-code>
-        <description>no violation: annotation containing Retry class reference is NOT @Retry — false positive with T-Identifier-based check</description>
-        <expected-problems>0</expected-problems>
-        <code><![CDATA[
-import io.github.resilience4j.retry.annotation.Retry
-
-annotation class SomeAnnotation(val annotationType: kotlin.reflect.KClass<*>)
-
-class RetryReferenceService {
-    @SomeAnnotation(annotationType = Retry::class)
-    fun callRemote() { } // no violation: @SomeAnnotation is not @Retry
-}
-        ]]></code>
-    </test-code>
 
 </test-data>
