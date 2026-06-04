@@ -1507,7 +1507,7 @@ class BadNames {
             <property name="xpath">
                 <value><![CDATA[
 //StringLiteral[
-    ancestor::Annotation
+    ancestor::Annotation[pmd-kotlin:hasAnnotation('kotlin.Suppress') or pmd-kotlin:hasAnnotation('java.lang.SuppressWarnings')]
     and LineStringLiteral/LineStringContent/T-LineStrText[
         matches(@Text, $ruleIdMatches)
         and not(matches(@Text, $ruleIdNotMatches))
@@ -1537,7 +1537,7 @@ fun process() {}
             <property name="xpath">
                 <value><![CDATA[
 //StringLiteral[
-    ancestor::Annotation
+    ancestor::Annotation[pmd-kotlin:hasAnnotation('kotlin.Suppress') or pmd-kotlin:hasAnnotation('java.lang.SuppressWarnings')]
     and LineStringLiteral/LineStringContent/T-LineStrText[
         matches(@Text, $ruleIdMatches)
         and not(matches(@Text, $ruleIdNotMatches))

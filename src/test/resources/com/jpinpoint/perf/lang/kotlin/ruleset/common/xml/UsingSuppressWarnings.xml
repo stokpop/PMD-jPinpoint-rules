@@ -26,11 +26,12 @@ class BadJavaSuppress
     </test-code>
 
     <test-code>
-        <description>good: no suppression annotation</description>
+        <description>good: string literal in non-suppress annotation should not trigger (false positive check)</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
-class GoodNoSuppress {
-    val x = 1
+class GoodOtherAnnotation {
+    @SomeAnnotation("PMD.UnconditionalCreatedLogArguments")
+    fun process() {}
 }
         ]]></code>
     </test-code>

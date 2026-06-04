@@ -39,11 +39,11 @@ class GoodSpecificRule {
     </test-code>
 
     <test-code>
-        <description>good: unrelated suppress id</description>
+        <description>good: string literal in non-suppress annotation should not trigger (false positive check)</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
-class GoodUnusedVariable {
-    @Suppress("UNUSED_VARIABLE")
+class GoodOtherAnnotation {
+    @SomeAnnotation("AvoidMutableStaticFields")
     fun process() {}
 }
         ]]></code>
