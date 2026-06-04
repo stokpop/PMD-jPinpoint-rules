@@ -718,7 +718,7 @@ class Service(registry: RetryRegistry) {
             <property name="tags" value="cpu,jpinpoint-rule,performance,resilience,suspicious,sustainability-low" type="String" description="classification"/>
             <property name="xpath">
                 <value><![CDATA[
-//Annotation[.//T-Identifier[@Text='Retry' or @Text='Retryable']]
+//Annotation[pmd-kotlin:hasAnnotation('Retry') or pmd-kotlin:hasAnnotation('Retryable')]
 ,
 //PropertyDeclaration[
     not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))

@@ -63,4 +63,21 @@ class Foo {
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>no violation: @Scope with non-prototype value + unrelated annotation with "prototype" string — false positive with text-based @Scope check</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Component
+import org.springframework.web.bind.annotation.RequestMapping
+
+@Component
+@Scope("singleton")
+@RequestMapping("prototype")
+class SingletonBean {
+    @Volatile var counter = 0 // good: singleton is not prototype scoped
+}
+        ]]></code>
+    </test-code>
+
 </test-data>

@@ -492,8 +492,8 @@ class Good {
   )
   (: exclude request/prototype scope :)
   and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
-  and not(.//Annotation//T-Identifier[@Text='Scope']
-      and .//Annotation//T-LineStrText[@Text='request' or @Text='prototype'])
+  and not(.//Annotation[pmd-kotlin:hasAnnotation('Scope')]
+      //T-LineStrText[@Text='request' or @Text='prototype'])
   (: exclude @NotThreadSafe :)
   and not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
   (: exclude @ConfigurationProperties unless has Setter annotation :)
@@ -755,8 +755,8 @@ class Good {
   )
   (: exclude request/prototype scope :)
   and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
-  and not(.//Annotation//T-Identifier[@Text='Scope']
-      and .//Annotation//T-LineStrText[@Text='request' or @Text='prototype'])
+  and not(.//Annotation[pmd-kotlin:hasAnnotation('Scope')]
+      //T-LineStrText[@Text='request' or @Text='prototype'])
   (: exclude @NotThreadSafe :)
   and not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
   (: exclude @ConfigurationProperties unless has Setter annotation :)
@@ -865,7 +865,7 @@ class Good : SomeParent() {
   (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
       not(pmd-kotlin:isWithin('function-body'))
-      and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[@Text='this']
+      and .//Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]//T-LineStrText[@Text='this']
     ]/VariableDeclaration/@Identifier
   ]
   (: not inside synchronized(this) block :)
@@ -896,7 +896,7 @@ class Good : SomeParent() {
   and SimpleIdentifier/T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
       not(pmd-kotlin:isWithin('function-body'))
-      and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[@Text='this']
+      and .//Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]//T-LineStrText[@Text='this']
     ]/VariableDeclaration/@Identifier
   ]
   (: not a function call (function name followed by CallSuffix) :)
@@ -969,7 +969,7 @@ class Good {
   (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
       not(pmd-kotlin:isWithin('function-body'))
-      and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[
+      and .//Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]//T-LineStrText[
         not(@Text = 'this')
         and @Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier
       ]
@@ -983,7 +983,7 @@ class Good {
         and .//CallSuffix/ValueArguments//T-Identifier/@Text =
           ancestor::ClassBody[1]//PropertyDeclaration[
             not(pmd-kotlin:isWithin('function-body'))
-            and .//Annotation[.//T-Identifier[@Text='GuardedBy']]
+            and .//Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]
           ]//T-LineStrText/@Text
       ]
     ]
@@ -1005,7 +1005,7 @@ class Good {
   and SimpleIdentifier/T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
       not(pmd-kotlin:isWithin('function-body'))
-      and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[
+      and .//Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]//T-LineStrText[
         not(@Text = 'this')
         and @Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier
       ]
@@ -1019,7 +1019,7 @@ class Good {
         and .//CallSuffix/ValueArguments//T-Identifier/@Text =
           ancestor::ClassBody[1]//PropertyDeclaration[
             not(pmd-kotlin:isWithin('function-body'))
-            and .//Annotation[.//T-Identifier[@Text='GuardedBy']]
+            and .//Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]
           ]//T-LineStrText/@Text
       ]
     ]
@@ -1040,7 +1040,7 @@ class Good {
   (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
       not(pmd-kotlin:isWithin('function-body'))
-      and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[
+      and .//Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]//T-LineStrText[
         not(@Text = 'this')
         and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier)
       ]
@@ -1063,7 +1063,7 @@ class Good {
   and SimpleIdentifier/T-Identifier[
     @Text = ancestor::ClassBody[1]//PropertyDeclaration[
       not(pmd-kotlin:isWithin('function-body'))
-      and .//Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText[
+      and .//Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]//T-LineStrText[
         not(@Text = 'this')
         and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier)
       ]
@@ -1118,13 +1118,13 @@ class Good {
 
 (: Check 1: @GuardedBy argument is not a String literal :)
 //PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]
-  //Annotation[.//T-Identifier[@Text='GuardedBy']]
+  //Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]
     [.//ValueArguments/ValueArgument[not(.//LineStringLiteral)]]
 
 |
 (: Check 2: @GuardedBy value refers to non-existent field, not "this" :)
 //PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]
-  //Annotation[.//T-Identifier[@Text='GuardedBy']]
+  //Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]
     //T-LineStrText[
       not(@Text = 'this')
       and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]/VariableDeclaration/@Identifier)
@@ -1133,7 +1133,7 @@ class Good {
 |
 (: Check 3: @GuardedBy("this") but no @Synchronized method and no synchronized(this) call in class :)
 //PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]
-  //Annotation[.//T-Identifier[@Text='GuardedBy']]
+  //Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]
     //T-LineStrText[@Text = 'this'
       and not(ancestor::ClassBody[1]//FunctionDeclaration[
         pmd-kotlin:hasAnnotation('Synchronized')
@@ -1151,7 +1151,7 @@ class Good {
   (: this property is referenced by a @GuardedBy annotation :)
   and VariableDeclaration/@Identifier =
     ancestor::ClassBody[1]//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body'))]
-      //Annotation[.//T-Identifier[@Text='GuardedBy']]//T-LineStrText/@Text
+      //Annotation[pmd-kotlin:hasAnnotation('GuardedBy')]//T-LineStrText/@Text
   (: but it is not private val :)
   and (@Mutable = true() or not(pmd-kotlin:modifiers() = 'private'))
 ]
@@ -1755,11 +1755,10 @@ class OrderService {
 //PropertyDeclaration[
     pmd-kotlin:hasAnnotation('Volatile')
     and ancestor::ClassDeclaration[
-        .//Annotation//T-Identifier[@Text='Scope']
-        and (
-            .//Annotation//T-LineStrText[@Text='prototype']
-            or .//Annotation//T-Identifier[@Text='SCOPE_PROTOTYPE']
-        )
+        .//Annotation[pmd-kotlin:hasAnnotation('Scope')][
+            .//T-LineStrText[@Text='prototype']
+            or .//T-Identifier[@Text='SCOPE_PROTOTYPE']
+        ]
     ]
 ]
                 ]]></value>

@@ -180,4 +180,27 @@ class Good : SomeParent() {
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>violation: @Scope with non-request value and unrelated annotation with "request" string — false negative with text-based @Scope check</description>
+        <expected-problems>1</expected-problems>
+        <code><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Service
+import org.springframework.web.bind.annotation.RequestMapping
+
+open class Base {
+    val mutableMap: java.util.HashMap<String, String> = java.util.HashMap()
+}
+
+@Service
+@Scope("production")
+@RequestMapping("request")
+class ProductionScopedService : Base() {
+    fun doWork() {
+        mutableMap.put("k", "x") // bad
+    }
+}
+        ]]></code>
+    </test-code>
+
 </test-data>
