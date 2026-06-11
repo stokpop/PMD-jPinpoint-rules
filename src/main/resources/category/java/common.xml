@@ -1005,6 +1005,7 @@ public void process(ConsumerRecord consRecord) {
           externalInfoUrl="${doc_root}/JavaCodePerformance.md#il06">
         <description>Problem: Creation of a log argument with a toString or other operation(s) may be expensive, while depending on the log level, the result may not be used.&#13;
             Solution: Create the log argument conditionally on the log level, within an if statement. For just 'obj.toString()', just pass 'obj' to the log method and leave it to SLF4J to call toString() only if needed.
+            Note: If creation of the log argument has side effects, it may be a false positive.
         </description>
         <priority>2</priority>
         <properties>
@@ -1159,6 +1160,7 @@ public RetrieveCache(final @Value("${cache.expiryTimeMillis}") long timeToLiveMi
 [not(pmd-java:hasAnnotation('lombok.Data') or pmd-java:hasAnnotation('lombok.Value')or pmd-java:hasAnnotation('lombok.EqualsAndHashCode')
 (: exclusions, the following annotations assume a non-value object -:)
     or pmd-java:hasAnnotation('javax.ejb.Singleton') or pmd-java:hasAnnotation('jakarta.ejb.Singleton')
+    or pmd-java:hasAnnotation('javax.ejb.Stateless') or pmd-java:hasAnnotation('jakarta.enterprise.context.ApplicationScoped')
     or pmd-java:hasAnnotation('org.springframework.stereotype.Component') or pmd-java:hasAnnotation('org.springframework.stereotype.Controller')
     or pmd-java:hasAnnotation('org.springframework.stereotype.Service') or pmd-java:hasAnnotation('org.springframework.stereotype.Repository')
     or pmd-java:hasAnnotation('org.springframework.context.annotation.Configuration')
