@@ -1367,7 +1367,7 @@ class Point(val x: Int, val y: Int) // bad: prefer data class
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
           message="Improper variable name."
-          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#iivn01">
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodeQuality.md#m01">
         <description>Problem: non descriptive variable names such as value, int1, or var1 make code harder to understand.&#13;
             Solution: use domain specific names that communicate intent. (jpinpoint-rules)</description>
         <priority>3</priority>
@@ -1952,7 +1952,7 @@ import java.util.List // good - java.util is always available
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
           message="Audit uses of suppression annotations."
-          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#isw01">
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodeQuality.md#m02">
         <description>Problem: suppressing warnings can hide issues that should be reviewed explicitly.&#13;
             Solution: audit suppression annotations and narrow them where possible. (jpinpoint-rules)</description>
         <priority>3</priority>
