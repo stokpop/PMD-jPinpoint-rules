@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: setQueueCapacity missing, setCorePoolSize and setMaxPoolSize present</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+class Klass {
+    fun bad(): ThreadPoolTaskExecutor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.setCorePoolSize(10)
+        executor.setMaxPoolSize(20)
+        executor.initialize()
+        return executor
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: setQueueCapacity missing, Kotlin property syntax for pool sizes</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+class Klass {
+    fun bad(): ThreadPoolTaskExecutor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.corePoolSize = 10
+        executor.maxPoolSize = 20
+        executor.initialize()
+        return executor
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: setQueueCapacity missing in @Bean function</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.context.annotation.Bean
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+class Config {
+    @Bean
+    fun taskExecutor(): ThreadPoolTaskExecutor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.setCorePoolSize(5)
+        executor.initialize()
+        return executor
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: setQueueCapacity present</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+class Klass {
+    fun good(): ThreadPoolTaskExecutor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.setCorePoolSize(10)
+        executor.setQueueCapacity(10)
+        executor.setMaxPoolSize(20)
+        executor.initialize()
+        return executor
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: queueCapacity set via Kotlin property syntax</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+class Klass {
+    fun good(): ThreadPoolTaskExecutor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.corePoolSize = 10
+        executor.queueCapacity = 10
+        executor.maxPoolSize = 20
+        executor.initialize()
+        return executor
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: no pool size configuration, no queue capacity needed</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+class Klass {
+    fun good(): ThreadPoolTaskExecutor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.initialize()
+        return executor
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
