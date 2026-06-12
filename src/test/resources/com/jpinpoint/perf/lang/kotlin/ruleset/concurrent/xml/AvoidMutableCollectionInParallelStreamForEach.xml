@@ -32,6 +32,51 @@ class ParallelCollector {
     </test-code>
 
     <test-code>
+        <description>bad: parallel stream mutates TreeMap</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.TreeMap
+class ParallelCollector {
+    fun bad(list: List<String>) {
+        val results = TreeMap<String, String>()
+        list.parallelStream().forEach { results.put(it, it.uppercase()) }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: parallel stream mutates TreeSet</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.TreeSet
+class ParallelCollector {
+    fun bad(list: List<String>) {
+        val results = TreeSet<String>()
+        list.parallelStream().forEach { results.add(it) }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: parallel stream mutates ArrayDeque</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.ArrayDeque
+class ParallelCollector {
+    fun bad(list: List<String>) {
+        val results = ArrayDeque<String>()
+        list.parallelStream().forEach { results.add(it) }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
         <description>good: map and toList</description>
         <expected-problems>0</expected-problems>
         <code><![CDATA[
