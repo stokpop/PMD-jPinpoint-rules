@@ -1733,6 +1733,7 @@ when (type) {
     and not(pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Configuration'))
     and not(pmd-kotlin:hasAnnotation('jakarta.persistence.Entity'))
     and not(pmd-kotlin:hasAnnotation('javax.persistence.Entity'))
+    and not(.//DelegationSpecifier[pmd-kotlin:typeIs('java.lang.Throwable')])
     and (
         count(ClassBody//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))])
         + count(PrimaryConstructor//ClassParameter[@Identifier])

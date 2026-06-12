@@ -69,4 +69,15 @@ class ExplicitPoint(val x: Int, val y: Int) {
 }
         ]]></code>
     </test-code>
+
+    <test-code>
+        <description>no violation: exception classes should not require equals/hashCode or data class</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class ServiceException(val errorCode: String, val detail: String) : RuntimeException("$errorCode: $detail") // good
+
+class BusinessException(message: String, val code: String, val description: String) : Exception(message) // good
+        ]]></code>
+    </test-code>
+
 </test-data>
