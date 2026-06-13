@@ -1348,6 +1348,7 @@ class Bad(private val id: String) {
     and not(pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Configuration'))
     and not(pmd-kotlin:hasAnnotation('jakarta.persistence.Entity'))
     and not(pmd-kotlin:hasAnnotation('javax.persistence.Entity'))
+    and not(.//DelegationSpecifier[pmd-kotlin:typeIs('java.lang.Throwable')])
     and (
         count(ClassBody//PropertyDeclaration[not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))])
         + count(PrimaryConstructor//ClassParameter[@Identifier])
@@ -2359,6 +2360,11 @@ class Service {
                 or pmd-kotlin:typeIs('java.util.HashMap')
                 or pmd-kotlin:typeIs('java.util.HashSet')
                 or pmd-kotlin:typeIs('java.util.LinkedList')
+                or pmd-kotlin:typeIs('java.util.TreeMap')
+                or pmd-kotlin:typeIs('java.util.TreeSet')
+                or pmd-kotlin:typeIs('java.util.EnumMap')
+                or pmd-kotlin:typeIs('java.util.ArrayDeque')
+                or pmd-kotlin:typeIs('java.util.PriorityQueue')
                 or pmd-kotlin:typeIs('kotlin.collections.MutableList')
             ]/VariableDeclaration/@Identifier
     ]
@@ -3952,6 +3958,68 @@ class ClientFactory {
         ]]></example>
     </rule>
 
+    <rule name="AvoidExcessiveClassloadingWithSaajSoap"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid excessive class loading with SAAJ SOAP messaging, use alternative Axiom, or system properties."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi23">
+        <description>Problem: SAAJ uses DOM to load the XML document in memory, which uses a TransformerFactory. The
+            implementation class of it is loaded on every call that causes lock contention under load. This means long
+            response times.
+            Solution: If possible, use Axiom SOAP messaging which uses the faster StAX. If you have/want to stick to
+            SAAJ, set the proper system properties to prevent the excessive class loading.
+            Note: Axiom (2.0) is available again in Spring web services, since version 4.1.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Constructor call to SaajSoapMessageFactory without TransformerFactory system property fix :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.springframework.ws.soap.saaj.SaajSoapMessageFactory#<init>(*)')
+    and not(ancestor::ClassBody//PostfixUnaryExpression[
+        PrimaryExpression[@Identifier='System']
+        and PostfixUnarySuffix/NavigationSuffix[@Identifier='setProperty']
+        and .//T-LineStrText[@Text='javax.xml.transform.TransformerFactory']
+    ])
+]
+,
+(: Class-level property with explicit SaajSoapMessageFactory type (no constructor call — that is caught above) :)
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and pmd-kotlin:typeIs('org.springframework.ws.soap.saaj.SaajSoapMessageFactory')
+    and not(.//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.springframework.ws.soap.saaj.SaajSoapMessageFactory#<init>(*)')])
+    and not(ancestor::ClassBody//PostfixUnaryExpression[
+        PrimaryExpression[@Identifier='System']
+        and PostfixUnarySuffix/NavigationSuffix[@Identifier='setProperty']
+        and .//T-LineStrText[@Text='javax.xml.transform.TransformerFactory']
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.ws.soap.saaj.SaajSoapMessageFactory
+import javax.xml.soap.MessageFactory
+
+class Bad {
+    val factory = SaajSoapMessageFactory(MessageFactory.newInstance()) // bad
+}
+
+class Good {
+    companion object {
+        init {
+            System.setProperty("javax.xml.transform.TransformerFactory",
+                "com.sun.org.apache.xalan.internal.xsltc.trax.TransformerFactoryImpl")
+        }
+    }
+    val factory = SaajSoapMessageFactory(MessageFactory.newInstance()) // good
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidHardcodedConnectionConfig"
           message="Avoid hardcoded connection configuration."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
@@ -4982,6 +5050,58 @@ class RetryService {
     @Retry(name = "remote-service") // inform
     fun callRemote() {
     }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="SetQueueCapacityForTaskExecutor"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Configure the queue capacity for the ThreadPoolTaskExecutor."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ia05">
+        <description>The org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor queue capacity is not configured.
+            Problem: It has a default queue capacity which is unlimited which can lead to an out of memory situation.
+            Solution: Call setQueueCapacity (or set queueCapacity property), for instance with a value equal to CorePoolSize.
+            Note that the pool will only grow beyond CorePoolSize up to MaxPoolSize when the queue is full.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,memory,performance,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Flag ThreadPoolTaskExecutor creations in functions that set core/max pool size but omit queue capacity :)
+//FunctionDeclaration[
+    .//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor#<init>(*)')]
+    and (
+        .//NavigationSuffix[@Identifier='setCorePoolSize' or @Identifier='corePoolSize']
+        or .//NavigationSuffix[@Identifier='setMaxPoolSize' or @Identifier='maxPoolSize']
+    )
+    and not(
+        .//NavigationSuffix[@Identifier='setQueueCapacity' or @Identifier='queueCapacity']
+    )
+]/.//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor#<init>(*)')]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+
+fun bad(): ThreadPoolTaskExecutor {
+    val executor = ThreadPoolTaskExecutor()
+    executor.setCorePoolSize(10)
+    executor.setMaxPoolSize(20)
+    executor.initialize()
+    return executor // bad: setQueueCapacity missing
+}
+
+fun good(): ThreadPoolTaskExecutor {
+    val executor = ThreadPoolTaskExecutor()
+    executor.setCorePoolSize(10)
+    executor.setQueueCapacity(10)
+    executor.setMaxPoolSize(20)
+    executor.initialize()
+    return executor
 }
         ]]></example>
     </rule>
