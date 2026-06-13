@@ -154,6 +154,13 @@
             <artifactId>hibernate-core</artifactId>
             <version>5.6.15.Final</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.springframework.ws/spring-ws-core -->
+        <dependency>
+            <groupId>org.springframework.ws</groupId>
+            <artifactId>spring-ws-core</artifactId>
+            <version>4.0.12</version>
+            <scope>test</scope>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.apache.openjpa/openjpa-persistence-jdbc -->
         <dependency>
             <groupId>org.apache.openjpa</groupId>

@@ -1191,6 +1191,68 @@ class BadInterceptor : org.springframework.http.client.ClientHttpRequestIntercep
         ]]></example>
     </rule>
 
+    <rule name="AvoidExcessiveClassloadingWithSaajSoap"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid excessive class loading with SAAJ SOAP messaging, use alternative Axiom, or system properties."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi23">
+        <description>Problem: SAAJ uses DOM to load the XML document in memory, which uses a TransformerFactory. The
+            implementation class of it is loaded on every call that causes lock contention under load. This means long
+            response times.
+            Solution: If possible, use Axiom SOAP messaging which uses the faster StAX. If you have/want to stick to
+            SAAJ, set the proper system properties to prevent the excessive class loading.
+            Note: Axiom (2.0) is available again in Spring web services, since version 4.1.
+            (jpinpoint-rules)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Constructor call to SaajSoapMessageFactory without TransformerFactory system property fix :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.springframework.ws.soap.saaj.SaajSoapMessageFactory#<init>(*)')
+    and not(ancestor::ClassBody//PostfixUnaryExpression[
+        PrimaryExpression[@Identifier='System']
+        and PostfixUnarySuffix/NavigationSuffix[@Identifier='setProperty']
+        and .//T-LineStrText[@Text='javax.xml.transform.TransformerFactory']
+    ])
+]
+,
+(: Class-level property with explicit SaajSoapMessageFactory type (no constructor call — that is caught above) :)
+//PropertyDeclaration[
+    not(pmd-kotlin:isWithin('function-body') or pmd-kotlin:isWithin('lambda'))
+    and pmd-kotlin:typeIs('org.springframework.ws.soap.saaj.SaajSoapMessageFactory')
+    and not(.//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.springframework.ws.soap.saaj.SaajSoapMessageFactory#<init>(*)')])
+    and not(ancestor::ClassBody//PostfixUnaryExpression[
+        PrimaryExpression[@Identifier='System']
+        and PostfixUnarySuffix/NavigationSuffix[@Identifier='setProperty']
+        and .//T-LineStrText[@Text='javax.xml.transform.TransformerFactory']
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.ws.soap.saaj.SaajSoapMessageFactory
+import javax.xml.soap.MessageFactory
+
+class Bad {
+    val factory = SaajSoapMessageFactory(MessageFactory.newInstance()) // bad
+}
+
+class Good {
+    companion object {
+        init {
+            System.setProperty("javax.xml.transform.TransformerFactory",
+                "com.sun.org.apache.xalan.internal.xsltc.trax.TransformerFactoryImpl")
+        }
+    }
+    val factory = SaajSoapMessageFactory(MessageFactory.newInstance()) // good
+}
+        ]]></example>
+    </rule>
+
     <rule name="SetQueueCapacityForTaskExecutor"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"

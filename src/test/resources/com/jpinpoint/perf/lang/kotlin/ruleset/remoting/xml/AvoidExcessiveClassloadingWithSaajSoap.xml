@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: SaajSoapMessageFactory constructed without TransformerFactory system property fix</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.ws.soap.saaj.SaajSoapMessageFactory
+import javax.xml.soap.MessageFactory
+class Bad {
+    val factory = SaajSoapMessageFactory(MessageFactory.newInstance())
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: SaajSoapMessageFactory as explicit field type without fix</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.ws.soap.saaj.SaajSoapMessageFactory
+class Bad {
+    lateinit var factory: SaajSoapMessageFactory
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: SaajSoapMessageFactory with TransformerFactory system property set in companion object</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.ws.soap.saaj.SaajSoapMessageFactory
+import javax.xml.soap.MessageFactory
+class Good {
+    companion object {
+        init {
+            System.setProperty("javax.xml.transform.TransformerFactory",
+                "com.sun.org.apache.xalan.internal.xsltc.trax.TransformerFactoryImpl")
+        }
+    }
+    val factory = SaajSoapMessageFactory(MessageFactory.newInstance())
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: SaajSoapMessageFactory with TransformerFactory system property set in init block</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.ws.soap.saaj.SaajSoapMessageFactory
+import javax.xml.soap.MessageFactory
+class Good {
+    init {
+        System.setProperty("javax.xml.transform.TransformerFactory",
+            "com.sun.org.apache.xalan.internal.xsltc.trax.TransformerFactoryImpl")
+    }
+    val factory = SaajSoapMessageFactory(MessageFactory.newInstance())
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
