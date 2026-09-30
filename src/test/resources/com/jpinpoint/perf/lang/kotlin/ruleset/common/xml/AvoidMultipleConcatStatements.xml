@@ -433,14 +433,14 @@ class AvoidMultipleConcatStatementsMapPairPlus {
 
     <test-code>
         <description>String property LHS with repeated += should be flagged once</description>
-        <expected-problems>0</expected-problems>
-<!--        <expected-linenumbers>5</expected-linenumbers>-->
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
         <code><![CDATA[
 class AvoidMultipleConcatStatementsStringPropertyPlus {
     var prop: String = ""
     fun bad() {
         prop += "A"
-        prop += "B" // bad (not reported by current rule)
+        prop += "B" // bad
     }
 }
         ]]></code>
@@ -478,15 +478,15 @@ class AvoidMultipleConcatStatementsCharToStringPlus {
 
     <test-code>
         <description>Scope function apply modifies String property with two += should be flagged once</description>
-        <expected-problems>0</expected-problems>
-<!--        <expected-linenumbers>6</expected-linenumbers>-->
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
         <code><![CDATA[
 class AvoidMultipleConcatStatementsApplyPlus {
     var msg: String = ""
     fun bad() {
         this.apply {
             msg += "A"
-            msg += "B" // bad (not reported by current rule)
+            msg += "B" // bad
         }
     }
 }
