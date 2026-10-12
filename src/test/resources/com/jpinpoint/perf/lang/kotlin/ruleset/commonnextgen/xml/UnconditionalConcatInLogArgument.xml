@@ -96,4 +96,62 @@ class LoggingService(private val log: Logger) {
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>good: text only debug</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun good() {
+        log.debug("Starting the service")
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: text only info and trace</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun good() {
+        log.info("Service started")
+        log.trace("Entering method")
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: text only with placeholder and single argument variable</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun good(id: String) {
+        log.debug("Getting user {}", id)
+        log.debug(id)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: text only with dollar escaped and special characters</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun good() {
+        log.debug("Cost is \$5 (approx.)")
+    }
+}
+        ]]></code>
+    </test-code>
+
 </test-data>

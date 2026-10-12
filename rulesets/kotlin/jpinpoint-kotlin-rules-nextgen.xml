@@ -1808,8 +1808,9 @@ class Good {
         or PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = 'log'
     )
     and (
-        PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef
-        or PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//AdditiveExpression
+        (: string template with $var, ${expr} or concatenation with +; plain text is cheap :)
+        PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//(T-LineStrRef | T-MultiLineStrRef | LineStringExpression | MultiLineStringExpression)
+        or PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//AdditiveExpression/AdditiveOperator
     )
     and not(
         ancestor::IfExpression[
