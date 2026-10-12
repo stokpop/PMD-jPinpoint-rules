@@ -203,4 +203,47 @@ class ProductionScopedService : Base() {
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>good: interceptor using static builder chain and mutating its own parameter, not an inherited field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+
+class ErrorResponse {
+    class Builder {
+        fun addStatus(s: String): Builder = this
+        fun build(): ErrorResponse = ErrorResponse()
+    }
+    companion object {
+        fun newBuilder(): Builder = Builder()
+    }
+}
+
+@Component
+class SampleInterceptor : Handler {
+    override fun preHandle(response: Any): Boolean {
+        val msg = ErrorResponse.newBuilder().addStatus("s").build()
+        response.status = 401
+        response.addHeader("A", "B")
+        return false
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: mutator at end of a chain on inherited field</description>
+        <expected-problems>1</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+
+@Component
+class Sample : Base() {
+    fun reset() {
+        cache.entries.clear()
+    }
+}
+        ]]></code>
+    </test-code>
+
 </test-data>

@@ -1125,8 +1125,11 @@ class Counter {
   and PostfixUnarySuffix/CallSuffix
   (: the receiver is a simple identifier :)
   and PrimaryExpression/SimpleIdentifier/T-Identifier[
+    (: not a type name (ErrorResponse.newBuilder().addStatus()): a class declared in this file, or
+       an imported one by naming convention (capital + lowercase; all-caps constants stay in scope) :)
+    not(matches(@Text, '^[A-Z][a-z0-9]') or @Text = ancestor::KotlinFile//(ClassDeclaration|ObjectDeclaration)/@Identifier)
     (: not a field declared in this class :)
-    not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
+    and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
     (: not a function parameter - Parameter has no @Identifier attribute, the name is
        nested under SimpleIdentifier/T-Identifier/@Text (confirmed via ast-dump) :)
     and not(@Text = ancestor::FunctionDeclaration[1]//FunctionValueParameter/Parameter/SimpleIdentifier/T-Identifier/@Text)
