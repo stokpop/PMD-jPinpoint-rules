@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: Calendar.getInstance().getTime() in function</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+import java.util.Calendar
+
+fun badDate(): java.util.Date = Calendar.getInstance().getTime() // bad: expensive, use Date() or LocalDate
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: Calendar.getInstance().getTimeInMillis()</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+import java.util.Calendar
+
+fun badMillis(): Long = Calendar.getInstance().getTimeInMillis() // bad: use System.currentTimeMillis()
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: GregorianCalendar.getInstance().getTime() in lambda</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.GregorianCalendar
+
+class Service {
+    fun badDates(count: Int) = (1..count).map {
+        GregorianCalendar.getInstance().getTime() // bad: Calendar used in lambda
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: idiomatic Kotlin LocalDate.now()</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.time.LocalDate
+import java.time.Instant
+
+fun goodDate() = LocalDate.now() // ok: Kotlin idiomatic
+fun goodMillis() = System.currentTimeMillis() // ok
+fun goodInstant() = Instant.now() // ok
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: new Date() is ok (not Calendar)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+fun goodDirectDate() = java.util.Date() // ok: direct, no Calendar overhead
+        ]]></code>
+    </test-code>
+
+</test-data>

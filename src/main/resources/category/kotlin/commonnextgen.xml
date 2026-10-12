@@ -52,4 +52,109 @@
         </example>
     </rule>
 
+    <rule name="AvoidCalendar"
+          language="kotlin"
+          message="A Calendar is inefficient in memory usage."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#imu01">
+        <description>Problem: A Calendar is a heavyweight object and expensive to create.
+            Solution: Use java.time.LocalDateTime or java.time.ZonedDateTime instead.
+            (jpinpoint-rules)
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,memory,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.Calendar#getInstance(*)')
+    or pmd-kotlin:matchesSig('java.util.Calendar#<init>(*)')
+    or pmd-kotlin:matchesSig('java.util.GregorianCalendar#<init>(*)')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.Calendar
+import java.time.LocalDateTime
+
+class Foo {
+    fun bad(): Calendar = Calendar.getInstance() // bad
+    fun good(): LocalDateTime = LocalDateTime.now() // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidCalendarDateCreation"
+          message="A Calendar is used to get a Date or millis; this is expensive. Use LocalDate.now(), Instant.now() or System.currentTimeMillis()."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ue01">
+        <description>Problem: Calendar.getInstance() is expensive as it scans locale and timezone configuration.
+            Using it just to get the current time or a Date object wastes CPU.
+            Solution: Use java.time.LocalDate.now(), java.time.Instant.now() or System.currentTimeMillis() for timestamps.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('java.util.Calendar#getInstance(*)')
+     or pmd-kotlin:matchesSig('java.util.GregorianCalendar#getInstance(*)'))
+    and (pmd-kotlin:matchesSig('java.util.Calendar#getTime(*)')
+         or pmd-kotlin:matchesSig('java.util.Calendar#getTimeInMillis(*)'))
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.util.Calendar
+fun bad() = Calendar.getInstance().getTime()    // bad: expensive
+fun good() = java.time.Instant.now()            // ok: idiomatic Kotlin/Java
+fun goodMs() = System.currentTimeMillis()       // ok
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidLoadingAllFromFile"
+          language="kotlin"
+          message="Files.readAll methods and similar APIs load all bytes into memory: a risk of memory problems."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isio03">
+        <description>Problem: APIs like Files.readAllBytes, Files.readAllLines, Files.readString,
+            InputStream.readAllBytes, IOUtils.toByteArray, ByteArrayOutputStream.toByteArray
+            load entire content into heap memory. This risks OutOfMemoryError, long GC pauses,
+            and slow responses when processing large files.
+            Solution: Use streaming APIs end-to-end, do not buffer whole files in memory.
+            Note: Not a problem for small files. Use @SuppressWarnings("PMD.AvoidLoadingAllFromFile") then.
+            (jpinpoint-rules)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,memory,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.nio.file.Files#readAllBytes(*)')
+    or pmd-kotlin:matchesSig('java.nio.file.Files#readAllLines(*)')
+    or pmd-kotlin:matchesSig('java.nio.file.Files#readString(*)')
+    or pmd-kotlin:matchesSig('java.io.InputStream#readAllBytes()')
+    or pmd-kotlin:matchesSig('java.io.ByteArrayOutputStream#toByteArray()')
+    or pmd-kotlin:matchesSig('org.springframework.util.ResizableByteArrayOutputStream#toByteArray()')
+    or pmd-kotlin:matchesSig('org.apache.commons.io.IOUtils#toByteArray(*)')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun bad(path: Path): ByteArray = Files.readAllBytes(path) // bad
+fun good(path: Path) = Files.newInputStream(path).use { it.copyTo(System.out) } // good
+        ]]></example>
+    </rule>
+
 </ruleset>

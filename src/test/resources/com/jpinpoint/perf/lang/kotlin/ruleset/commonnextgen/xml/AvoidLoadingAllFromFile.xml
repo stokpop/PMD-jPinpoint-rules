@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: Files.readAllBytes in method</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun bad(path: Path): ByteArray {
+    return Files.readAllBytes(path) // bad
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: Files.readAllLines in method</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun bad(path: Path): List<String> {
+    return Files.readAllLines(path) // bad
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: Files.readString in method</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun bad(path: Path): String {
+    return Files.readString(path) // bad
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: InputStream.readAllBytes()</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.io.InputStream
+
+class Foo {
+    fun bad(input: InputStream): ByteArray {
+        return input.readAllBytes() // bad
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: ByteArrayOutputStream.toByteArray()</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+
+class Foo {
+    fun bad(input: InputStream): ByteArray {
+        val baos = ByteArrayOutputStream()
+        return baos.toByteArray() // bad
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: Files.newInputStream streaming</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun good(path: Path) {
+    Files.newInputStream(path).use { stream ->
+        stream.copyTo(System.out) // streaming OK
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: IOUtils.toByteArray</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.io.InputStream
+import org.apache.commons.io.IOUtils
+
+class Foo {
+    fun bad(input: InputStream): ByteArray = IOUtils.toByteArray(input) // bad
+}
+        ]]></code>
+    </test-code>
+</test-data>

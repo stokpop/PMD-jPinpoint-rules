@@ -17,7 +17,7 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 
 ## Status (as of this note)
 
-52 of ~103 candidate rule changes migrated and committed, all tests green:
+57 of ~103 candidate rule changes migrated and committed, all tests green:
 
 | # | Rule | Nextgen file | Commit |
 |---|------|--------------|--------|
@@ -68,11 +68,16 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 | 45 | AvoidHardcodedConnectionConfig | remotingnextgen.xml | e41a69fe |
 | 46 | HttpClientImproperConnectionTimeouts | remotingnextgen.xml | e41a69fe |
 | 47 | UseCloseableForHttpClient | remotingnextgen.xml | e41a69fe |
-| 48 | AvoidUnclearHttpRouteSecurity | remotingnextgen.xml | (this commit) |
-| 49 | AvoidDiscardingHttpClientConfig | remotingnextgen.xml | (this commit) |
-| 50 | HttpClientBuilderPoolSettingsIgnored | remotingnextgen.xml | (this commit) |
-| 51 | AxualProducerCreatedForEachMethodCall | remotingnextgen.xml | (this commit) |
-| 52 | AvoidClientHttpRequestFactorySupplier | remotingnextgen.xml | (this commit) |
+| 48 | AvoidUnclearHttpRouteSecurity | remotingnextgen.xml | aa26e8b1 |
+| 49 | AvoidDiscardingHttpClientConfig | remotingnextgen.xml | aa26e8b1 |
+| 50 | HttpClientBuilderPoolSettingsIgnored | remotingnextgen.xml | aa26e8b1 |
+| 51 | AxualProducerCreatedForEachMethodCall | remotingnextgen.xml | aa26e8b1 |
+| 52 | AvoidClientHttpRequestFactorySupplier | remotingnextgen.xml | aa26e8b1 |
+| 53 | HttpInterceptorNotReleasingOnException | remotingnextgen.xml | (this commit) |
+| 54 | SetQueueCapacityForTaskExecutor | remotingnextgen.xml | (this commit) |
+| 55 | AvoidCalendar | commonnextgen.xml | (this commit) |
+| 56 | AvoidCalendarDateCreation | commonnextgen.xml | (this commit) |
+| 57 | AvoidLoadingAllFromFile | commonnextgen.xml | (this commit) |
 
 ## Full remaining scope
 
@@ -108,12 +113,12 @@ Remaining concurrent.xml rules: none
 (NB: `SetQueueCapacityForTaskExecutor` also appears under concurrent.xml in the source branch, but is
 a stale duplicate — resolved below, only the remoting.xml version is migrated)
 
-Remaining remoting.xml rules (all genuinely NEW; the base remoting.xml only has HttpClientBuilderWithoutDisableConnectionState,
+Remaining remoting.xml rules: (all genuinely NEW; the base remoting.xml only has HttpClientBuilderWithoutDisableConnectionState,
 HttpClientBuilderWithoutTimeouts, AvoidDeprecatedHystrix, HttpClientBuilderWithoutPoolSize and
 NettyConnectionProviderWithoutMaxOrTimeout, which are long-standing, newer than the kotlin-type-mapper
 versions and use no overlay - DO NOT migrate those 5; the type-mapper versions rely on a nonexistent
 @Identifier on NavigationSuffix/PrimaryExpression and fail 14 tests):
-HttpInterceptorNotReleasingOnException, SetQueueCapacityForTaskExecutor (the canonical, type-aware
+none - remoting.xml is fully migrated (SetQueueCapacityForTaskExecutor: the canonical, type-aware
 version — see resolution below)
 
 Note: `SetQueueCapacityForTaskExecutor` appears in both concurrent.xml and remoting.xml in
@@ -404,3 +409,9 @@ blockers — each has a reliable workaround in use today — but filing them cou
   `*nextgen*` source files) and `rulesets/kotlin/jpinpoint-kotlin-rules-nextgen.xml` (overlay, built
   only from `*nextgen.xml` source files) — always re-run after any nextgen source file change and
   commit the regenerated output alongside.
+
+### History check (common.xml)
+Verified via git history: the 11 modified base common.xml rules were last changed in base before kotlin-type-mapper
+branched (2025 - Jan 2026), and the branch contains the relevant fixes (issues 651/653/670), so its versions are
+supersets. Base-only post-branch fixes affect only AvoidMultipleConcatStatements (already in commonnextgen.xml).
+Still run each modified rule's tests under PMD 7.28.0 before keeping an overlay. 33 new common rules remain, 11 modified.
