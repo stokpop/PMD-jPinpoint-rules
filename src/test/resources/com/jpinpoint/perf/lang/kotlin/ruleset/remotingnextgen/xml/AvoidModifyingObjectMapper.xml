@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: configure ObjectMapper in function body</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>8</expected-linenumbers>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class MapperService {
+    private val mapper = ObjectMapper()
+
+    fun bad() {
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: register module in function body</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>9</expected-linenumbers>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+
+class MapperService {
+    private val mapper = ObjectMapper()
+
+    fun bad() {
+        val module = JavaTimeModule()
+        mapper.registerModule(module)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: disable feature in function body</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>8</expected-linenumbers>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+
+class MapperService {
+    private val mapper = ObjectMapper()
+
+    fun bad() {
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: configure in init block</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class MapperService {
+    private val mapper = ObjectMapper()
+
+    init {
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: configure in property initializer chain</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+
+class MapperHolder {
+    private val mapper = ObjectMapper().also { it.registerModule(JavaTimeModule()) }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

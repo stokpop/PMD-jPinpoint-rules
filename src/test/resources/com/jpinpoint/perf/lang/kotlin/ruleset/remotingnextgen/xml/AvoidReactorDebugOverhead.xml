@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: Hooks.onOperatorDebug in init block</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import reactor.core.publisher.Hooks
+
+class AppConfig {
+    init {
+        Hooks.onOperatorDebug() // bad: expensive in production
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: Hooks.onOperatorDebug in top-level function</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import reactor.core.publisher.Hooks
+
+fun enableDebug() {
+    Hooks.onOperatorDebug() // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: Hooks.onOperatorDebug in lambda also block</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import reactor.core.publisher.Hooks
+
+class App {
+    fun configure() = listOf("reactor").also {
+        Hooks.onOperatorDebug() // bad: inside lambda
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: no Hooks call</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import reactor.core.publisher.Flux
+
+class AppConfig {
+    fun getFlux(): Flux<String> = Flux.just("a", "b")
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

@@ -2016,6 +2016,95 @@ class Bad {
         </example>
     </rule>
 
+    <rule name="AvoidLeakingRetryEventConsumers"
+          message="Avoid registering retry event consumers inside methods; they leak lambda objects on each call."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi15">
+        <description>Problem: Calling getEventPublisher().onRetry/onError on a class-field Retry inside a method body
+            adds a new lambda consumer on every method call, causing a memory leak.
+            Solution: Register event consumers once in an init block or constructor.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,memory,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('io.github.resilience4j.retry.Retry#getEventPublisher(*)')
+    and (: isWithin pattern :)
+    ancestor::FunctionBody
+    and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+        ancestor::ClassBody[1]//PropertyDeclaration[
+            (: isWithin pattern :)
+            not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+        ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import io.github.resilience4j.retry.Retry
+import io.github.resilience4j.retry.RetryRegistry
+import java.util.concurrent.atomic.AtomicInteger
+class Service(registry: RetryRegistry) {
+    private val retryField: Retry = registry.retry("svc")
+    private val count = AtomicInteger()
+    init {
+        retryField.getEventPublisher().onRetry { count.getAndIncrement() } // ok: registered once
+    }
+    fun callService() { // avoid: retryField.getEventPublisher().onRetry { ... } here
+        retryField.executeCallable { "result" }
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidModifyingObjectMapper"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="ObjectMapper is configured/modified, only initialize it right after construction."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#iuojar02">
+        <description>Problem: ObjectMapper is thread-safe only after configuration; modifying it later is not thread-safe.
+            Solution: Configure it during initialization only, then reuse it immutably. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PostfixUnarySuffix/NavigationSuffix[
+        matches(SimpleIdentifier/*/@Text, '^(configure|set|register|find|disable|enable|activateDefaultTyping|deactivateDefaultTyping|add|clear).*')
+    ]
+    and PostfixUnarySuffix/CallSuffix
+    and (: isWithin pattern :)
+    ancestor::FunctionBody
+    and not(ancestor::AnonymousInitializer)
+    and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+        ancestor::ClassBody[1]//PropertyDeclaration[
+            (: isWithin pattern :)
+            not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+            and pmd-kotlin:typeIs('com.fasterxml.jackson.databind.ObjectMapper')
+        ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class MapperService {
+    private val mapper = ObjectMapper()
+
+    fun bad() {
+        mapper.registerModule(JavaTimeModule()) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidObjectMapperAsField"
           language="kotlin"
           message="Avoid ObjectMapper as field, use ObjectReader or ObjectWriter instead."
@@ -2055,6 +2144,79 @@ class Foo {
     private val reader: ObjectReader = ObjectMapper().readerFor(Any::class.java) // good
 }
         ]]></example>
+    </rule>
+
+    <rule name="AvoidReactorDebugOverhead"
+          message="Do not use Reactor debugging in production, it has much overhead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi14">
+        <description>Problem: For troubleshooting Reactor, Blockhound can be used. It needs proper stack traces which
+            can be achieved by Hooks.onOperatorDebug(). This can have much CPU overhead.
+            Solution: Remove Hooks.onOperatorDebug() when not debugging. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('reactor.core.publisher.Hooks#onOperatorDebug()')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import reactor.core.publisher.Hooks
+
+class AppConfig {
+    init {
+        Hooks.onOperatorDebug() // bad: heavy overhead in production
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidRecreatingHttpClient"
+          message="An HttpClient is created inside a method. Create and reuse it as a shared field instead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi12">
+        <description>Problem: Apache HttpClient with its connection pool and timeouts should be setup once and then used
+            for many requests. It is quite expensive to create and can only provide the benefits of pooling when reused.
+            Solution: Create the HttpClient once and store it in a shared field (companion object or injected bean).
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('org.apache.http.impl.client.HttpClientBuilder#create(*)')
+     or pmd-kotlin:matchesSig('org.apache.http.impl.client.HttpClients#custom(*)')
+     or pmd-kotlin:matchesSig('org.apache.http.impl.nio.client.HttpAsyncClientBuilder#create(*)'))
+    (: isWithin pattern :)
+    and (ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and not(ancestor::PropertyDelegate)
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.apache.http.impl.client.HttpClients
+
+class Bad {
+    fun doRequest(url: String) =
+        HttpClients.custom().build() // bad: recreated per call
+            .execute(org.apache.http.client.methods.HttpGet(url))
+}
+class Good {
+    companion object {
+        private val HTTP_CLIENT = HttpClients.custom().build() // ok: created once
+    }
+}
+        ]]>
+        </example>
     </rule>
 
     <rule name="AvoidXMLGregorianCalendar"
@@ -2247,6 +2409,43 @@ class Foo {
     }
     fun toJson(obj: Any): String {
         return ObjectMapper().writeValueAsString(obj) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="RetryCanCauseOverload"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Be careful with retrying: multiple retry locations in a call chain can cause overload."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi13">
+        <description>Problem: Multiple Retry locations in a call chain multiply the number of calls and may cause overload during recovery.
+            Solution: Have the retry mechanism in one location in the chain only, recommended closest to the user. (jpinpoint-rules)</description>
+        <priority>5</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,resilience,suspicious,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: hasAnnotation() only resolves on the declaration node, so check it there and select the Annotation node by name :)
+//(ClassDeclaration|FunctionDeclaration)[
+    pmd-kotlin:hasAnnotation('io.github.resilience4j.retry.annotation.Retry')
+    or pmd-kotlin:hasAnnotation('org.springframework.retry.annotation.Retryable')
+]/Modifiers/Annotation[.//SimpleIdentifier/*/@Text=('Retry','Retryable')]
+|
+//PropertyDeclaration[
+    (: isWithin pattern :)
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and pmd-kotlin:typeIs('io.github.resilience4j.retry.Retry')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import io.github.resilience4j.retry.annotation.Retry
+
+class RetryService {
+    @Retry(name = "remote-service") // inform
+    fun callRemote() {
     }
 }
         ]]></example>

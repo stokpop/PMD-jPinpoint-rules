@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: getEventPublisher().onRetry on field Retry in function body</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>10</expected-linenumbers>
+        <code><![CDATA[
+import io.github.resilience4j.retry.Retry
+import io.github.resilience4j.retry.RetryRegistry
+import java.util.concurrent.atomic.AtomicInteger
+
+class Service(private val registry: RetryRegistry) {
+    private val retryField: Retry = registry.retry("svc")
+
+    fun callService() {
+        val retryCount = AtomicInteger()
+        retryField.getEventPublisher().onRetry { retryCount.getAndIncrement() } // bad: lambda leaks per call
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: getEventPublisher().onError on field Retry in lambda</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>9</expected-linenumbers>
+        <code><![CDATA[
+import io.github.resilience4j.retry.Retry
+import io.github.resilience4j.retry.RetryRegistry
+import java.util.concurrent.atomic.AtomicInteger
+
+class Service(private val registry: RetryRegistry) {
+    private val retryField: Retry = registry.retry("svc")
+    fun callAll(items: List<String>) = items.map { item ->
+        val count = AtomicInteger()
+        retryField.getEventPublisher().onError { count.getAndIncrement() } // bad: leaks in lambda
+        item
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: getEventPublisher().onRetry registered in init block (once)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import io.github.resilience4j.retry.Retry
+import io.github.resilience4j.retry.RetryRegistry
+import java.util.concurrent.atomic.AtomicInteger
+
+class Service(private val registry: RetryRegistry) {
+    private val retryField: Retry = registry.retry("svc")
+    private val retryCount = AtomicInteger()
+
+    init {
+        retryField.getEventPublisher().onRetry { retryCount.getAndIncrement() } // ok: registered once in init
+    }
+
+    fun callService() = retryField.executeCallable { "result" }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: getEventPublisher on local Retry (not a class field)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import io.github.resilience4j.retry.Retry
+import io.github.resilience4j.retry.RetryRegistry
+import java.util.concurrent.atomic.AtomicInteger
+
+class Service(private val registry: RetryRegistry) {
+    fun callService() {
+        val localRetry: Retry = registry.retry("local") // local variable, not a field
+        val count = AtomicInteger()
+        localRetry.getEventPublisher().onRetry { count.getAndIncrement() } // ok: local retry, no persistent leak
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

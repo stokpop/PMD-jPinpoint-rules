@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: HttpClients.custom in function body</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.impl.client.HttpClients
+
+class Bad {
+    fun doRequest(url: String) {
+        val client = HttpClients.custom().build() // bad: recreated per call
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: HttpClientBuilder.create single-expression function</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.impl.client.HttpClientBuilder
+
+class Bad {
+    fun buildClient() = HttpClientBuilder.create().build() // bad: single-expression, recreated per call
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: HttpClients.custom in lambda (map)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.impl.client.HttpClients
+
+class Bad {
+    fun doRequests(urls: List<String>) = urls.map { url ->
+        HttpClients.custom().build() // bad: new client per iteration
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: HttpClient in companion object</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.http.impl.client.HttpClients
+
+class Good {
+    companion object {
+        private val HTTP_CLIENT = HttpClients.custom().build() // ok: created once
+    }
+    fun doRequest(url: String) = HTTP_CLIENT.execute(org.apache.http.client.methods.HttpGet(url))
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: HttpClient as lazy top-level property</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.http.impl.client.HttpClients
+
+private val HTTP_CLIENT by lazy { HttpClients.custom().build() } // ok: lazy singleton
+
+fun doRequest(url: String) = HTTP_CLIENT.execute(org.apache.http.client.methods.HttpGet(url))
+        ]]></code>
+    </test-code>
+
+</test-data>

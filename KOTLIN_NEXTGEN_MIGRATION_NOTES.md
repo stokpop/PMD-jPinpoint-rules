@@ -17,7 +17,7 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 
 ## Status (as of this note)
 
-37 of ~103 candidate rule changes migrated and committed, all tests green:
+42 of ~103 candidate rule changes migrated and committed, all tests green:
 
 | # | Rule | Nextgen file | Commit |
 |---|------|--------------|--------|
@@ -53,11 +53,16 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 | 30 | AvoidXMLGregorianCalendar | remotingnextgen.xml | 00e30c73 |
 | 31 | AvoidObjectMapperAsField | remotingnextgen.xml | 00e30c73 |
 | 32 | ObjectMapperCreatedForEachMethodCall | remotingnextgen.xml | 00e30c73 |
-| 33 | GsonCreatedForEachMethodCall | remotingnextgen.xml | (this commit) |
-| 34 | BufferingClientHttpRequestFactoryIsMemoryGreedy | remotingnextgen.xml | (this commit) |
-| 35 | AvoidHttpHostOneArgumentConstructor | remotingnextgen.xml | (this commit) |
-| 36 | AvoidJAXBUtil | remotingnextgen.xml | (this commit) |
-| 37 | JAXBContextCreatedForEachMethodCall | remotingnextgen.xml | (this commit) |
+| 33 | GsonCreatedForEachMethodCall | remotingnextgen.xml | e90a4d2a |
+| 34 | BufferingClientHttpRequestFactoryIsMemoryGreedy | remotingnextgen.xml | e90a4d2a |
+| 35 | AvoidHttpHostOneArgumentConstructor | remotingnextgen.xml | e90a4d2a |
+| 36 | AvoidJAXBUtil | remotingnextgen.xml | e90a4d2a |
+| 37 | JAXBContextCreatedForEachMethodCall | remotingnextgen.xml | e90a4d2a |
+| 38 | AvoidReactorDebugOverhead | remotingnextgen.xml | (this commit) |
+| 39 | AvoidRecreatingHttpClient | remotingnextgen.xml | (this commit) |
+| 40 | AvoidLeakingRetryEventConsumers | remotingnextgen.xml | (this commit) |
+| 41 | RetryCanCauseOverload | remotingnextgen.xml | (this commit) |
+| 42 | AvoidModifyingObjectMapper | remotingnextgen.xml | (this commit) |
 
 ## Full remaining scope
 
@@ -98,8 +103,6 @@ HttpClientBuilderWithoutTimeouts, AvoidDeprecatedHystrix, HttpClientBuilderWitho
 NettyConnectionProviderWithoutMaxOrTimeout, which are long-standing, newer than the kotlin-type-mapper
 versions and use no overlay - DO NOT migrate those 5; the type-mapper versions rely on a nonexistent
 @Identifier on NavigationSuffix/PrimaryExpression and fail 14 tests):
-AvoidReactorDebugOverhead, AvoidRecreatingHttpClient,
-AvoidLeakingRetryEventConsumers, RetryCanCauseOverload, AvoidModifyingObjectMapper,
 AvoidDeprecatedHttpConnectors, DefaultFeignClientWithoutTLSConnectionReuse,
 AvoidHardcodedConnectionConfig, HttpClientImproperConnectionTimeouts, UseCloseableForHttpClient,
 AvoidUnclearHttpRouteSecurity, AvoidDiscardingHttpClientConfig, HttpClientBuilderPoolSettingsIgnored,
