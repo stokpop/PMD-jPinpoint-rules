@@ -17,7 +17,7 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 
 ## Status (as of this note)
 
-12 of ~103 candidate rule changes migrated and committed, all tests green:
+17 of ~103 candidate rule changes migrated and committed, all tests green:
 
 | # | Rule | Nextgen file | Commit |
 |---|------|--------------|--------|
@@ -33,6 +33,11 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 | 10 | AvoidMutableStaticFields | concurrentnextgen.xml | (this commit) |
 | 11 | AvoidStaticXmlFactories | concurrentnextgen.xml | (this commit) |
 | 12 | AvoidIncrementOrDecrementForVolatileField | concurrentnextgen.xml | (this commit) |
+| 13 | AvoidUnguardedAssignmentToNonFinalFieldsInSharedObjects | concurrentnextgen.xml | (this commit) |
+| 14 | AvoidCommonPoolForFutureAsync | concurrentnextgen.xml | (this commit) |
+| 15 | AvoidUnguardedAssignmentToNonFinalFieldsInObjectsUsingSynchronized | concurrentnextgen.xml | (this commit) |
+| 16 | AvoidUnguardedMutableFieldsInSharedObjects | concurrentnextgen.xml | (this commit) |
+| 17 | AvoidUnguardedMutableFieldsInObjectsUsingSynchronized | concurrentnextgen.xml | (this commit) |
 
 ## Full remaining scope
 
@@ -40,7 +45,7 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 (`upstream/pmd7-issue-674`):
 
 - **common.xml**: 31 brand-new rules + 12 modified existing rules (31+12 = 43 items)
-- **concurrent.xml**: entirely new category, 29 rules total (6 done, 23 remaining)
+- **concurrent.xml**: entirely new category, 29 rules total (11 done, 18 remaining)
 - **remoting.xml**: 31 rules total, mostly modifications of existing rules (1 done, 30 remaining)
 
 New rules in common.xml (not yet migrated):
@@ -64,14 +69,11 @@ AvoidRecompilingPatterns, AvoidRecompilingXPathExpression, AvoidRecreatingDateTi
 AvoidSimpleDateFormat, AvoidStringBuffer, AvoidWideScopeXPathExpression, AvoidXPathAPIUsage,
 MDCPutWithoutRemove
 
-Remaining concurrent.xml rules: AvoidFutureJoinWithoutTimeout,
-AvoidUnguardedAssignmentToNonFinalFieldsInSharedObjects, AvoidNonPrivateFieldsInSharedObjects,
-AvoidCommonPoolForFutureAsync, AvoidUnguardedAssignmentToNonFinalFieldsInObjectsUsingSynchronized,
-AvoidUnguardedMutableFieldsInSharedObjects, AvoidUnguardedMutableFieldsInObjectsUsingSynchronized,
+Remaining concurrent.xml rules:
 AvoidUnguardedMutableInheritedFieldsInSharedObjects, NotProperlySynchronizingOnThisWhileUsingGuardedBy,
-NotProperlySynchronizingOnFieldWhileUsingGuardedBy, WrongUseOfGuardedBy, AvoidStaticXmlFactories,
-AvoidMutableStaticFields, AvoidParallelFlux, AvoidThreadUnsafeJaxbUsage, AvoidReactorOnEachOperator,
-AvoidMDCInReactor, AvoidNonAtomicIfModifyOnConcurrentMap, AvoidIncrementOrDecrementForVolatileField,
+NotProperlySynchronizingOnFieldWhileUsingGuardedBy, WrongUseOfGuardedBy,
+AvoidParallelFlux, AvoidThreadUnsafeJaxbUsage, AvoidReactorOnEachOperator,
+AvoidMDCInReactor, AvoidNonAtomicIfModifyOnConcurrentMap,
 AvoidUserDataInSharedObjects, AvoidVolatileInPrototypeScope,
 AvoidMutableCollectionInParallelStreamForEach
 (NB: `SetQueueCapacityForTaskExecutor` also appears under concurrent.xml in the source branch, but is
@@ -285,6 +287,45 @@ ignore/drop the concurrent.xml duplicate.**
       (duplicates the base ruleset's content), but this is consistent with how the regular (non-nextgen)
       merged ruleset file already works (it also fully inlines all category files).
     - Filed as upstream improvement idea #5 below (resolving sibling refs relative to a parent URL).
+
+12. **A rule's `xpath` property must be ONE XPath expression — the source branch has several rules
+    written as two disconnected top-level expressions** (e.g. `//ClassDeclaration[...]` followed by
+    an unrelated `//Assignment[...]` or `//PropertyDeclaration[...]` on the next lines, with no
+    operator joining them at all). This is invalid/meaningless XPath (effectively the second
+    expression silently wins, or it fails to compile, depending on the engine) and was never actually
+    tested as written. Found in `AvoidUnguardedAssignmentToNonFinalFieldsInSharedObjects`,
+    `AvoidUnguardedAssignmentToNonFinalFieldsInObjectsUsingSynchronized`,
+    `AvoidUnguardedMutableFieldsInSharedObjects`, and
+    `AvoidUnguardedMutableFieldsInObjectsUsingSynchronized` — all four had a "Step 1: match the
+    shared/synchronized class" expression and a "Step 2: find the field/assignment" expression as two
+    separate top-level statements.
+    - **Fix**: combine into a single `//ClassDeclaration[<step-1-conditions>]//Assignment[<step-2-conditions>]`
+      (or `.../PropertyDeclaration[...]`) path — the same descendant-combinator pattern already proven
+      working in `AvoidNonPrivateFieldsInSharedObjects`. This correctly scopes "step 2" nodes to only
+      those found *within* a class matching "step 1", instead of two independent unrelated searches.
+
+13. **`pmd-kotlin:matchesSig()` CAN resolve Kotlin's `synchronized(lock) { ... }` block despite it
+    being an `inline` stdlib function with no real JVM call-site** (confirmed empirically — don't
+    assume inline functions are unmatchable). Two things had to be gotten right:
+    - The owner in the signature string must be the **bare package name**, not a facade class:
+      `'kotlin#synchronized(_,_)'` works; `'kotlin.StandardKt#synchronized(_,_)'` and
+      `'kotlin.SynchronizedKt#synchronized(_,_)'` do not (confirmed via `javap` that the generated
+      bytecode method is `private static final` on `kotlin.StandardKt__SynchronizedKt` — there is no
+      public JVM method to match a binary signature against at all, since the compiler copies the body
+      into every call site instead of emitting a real `invokestatic`; contrast with
+      `kotlin.collections.filter()`, also `inline`, which DOES emit a real public method for
+      Java-interop and resolves fine under its *extension-receiver type*, e.g.
+      `'kotlin.collections.Iterable#filter(_)'`, not a facade class either).
+    - This works with or without an explicit `--aux-classpath` pointing at the `kotlin-stdlib` jar
+      (unlike pitfall #7's non-JDK library requirement) — `kotlin.*` package resolution appears to be
+      bundled with `pmd-kotlin` itself.
+    - **Preferred pattern for "is this call/ancestor a call to kotlin's `synchronized` block"**:
+      `ancestor::PostfixUnaryExpression[pmd-kotlin:matchesSig('kotlin#synchronized(_,_)')]` — strictly
+      better than matching on the literal identifier text (`SimpleIdentifier/T-Identifier[@Text='synchronized']`),
+      since it can't be fooled by an unrelated user-defined function also named `synchronized` with a
+      different signature, and is immune to any future soft-keyword-tokenization surprises (pitfall #3).
+    - No upstream fix needed here — this was a case of using the wrong signature-string owner, not a
+      `pmd-kotlin`/`kotlin-type-mapper` bug.
 
 ## Upstream PMD improvement ideas (tracked, not yet filed)
 

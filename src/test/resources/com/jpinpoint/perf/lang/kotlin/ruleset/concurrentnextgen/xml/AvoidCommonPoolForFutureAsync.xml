@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: Avoid Common Pool for Future Async</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>8</expected-linenumbers>
+        <code><![CDATA[
+import java.util.concurrent.*
+
+class Foo {
+    private val asyncPool = Executors.newFixedThreadPool(10)
+
+    fun bad(accounts: List<Any>) {
+        val futures = accounts.map {
+            CompletableFuture.supplyAsync { isBlocked(it) } // bad, uses common pool
+        }
+    }
+
+    fun good(accounts: List<Any>) {
+        val futures = accounts.map {
+            CompletableFuture.supplyAsync({ isBlocked(it) }, asyncPool) // good
+        }
+    }
+}
+]]></code>
+    </test-code>
+
+</test-data>
