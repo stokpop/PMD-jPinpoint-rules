@@ -17,7 +17,7 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 
 ## Status (as of this note)
 
-17 of ~103 candidate rule changes migrated and committed, all tests green:
+22 of ~103 candidate rule changes migrated and committed, all tests green:
 
 | # | Rule | Nextgen file | Commit |
 |---|------|--------------|--------|
@@ -28,16 +28,21 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 | 5 | AvoidCommonPoolForBlockingCalls | concurrentnextgen.xml | 4cef4ea5 |
 | 6 | AvoidExecutorInvokeWithoutTimeout | concurrentnextgen.xml | 4cef4ea5 |
 | 7 | AvoidParallelStreamWithCommonPool | concurrentnextgen.xml | 4cef4ea5 |
-| 8 | AvoidFutureJoinWithoutTimeout | concurrentnextgen.xml | (this commit) |
-| 9 | AvoidNonPrivateFieldsInSharedObjects | concurrentnextgen.xml | (this commit) |
-| 10 | AvoidMutableStaticFields | concurrentnextgen.xml | (this commit) |
-| 11 | AvoidStaticXmlFactories | concurrentnextgen.xml | (this commit) |
-| 12 | AvoidIncrementOrDecrementForVolatileField | concurrentnextgen.xml | (this commit) |
-| 13 | AvoidUnguardedAssignmentToNonFinalFieldsInSharedObjects | concurrentnextgen.xml | (this commit) |
-| 14 | AvoidCommonPoolForFutureAsync | concurrentnextgen.xml | (this commit) |
-| 15 | AvoidUnguardedAssignmentToNonFinalFieldsInObjectsUsingSynchronized | concurrentnextgen.xml | (this commit) |
-| 16 | AvoidUnguardedMutableFieldsInSharedObjects | concurrentnextgen.xml | (this commit) |
-| 17 | AvoidUnguardedMutableFieldsInObjectsUsingSynchronized | concurrentnextgen.xml | (this commit) |
+| 8 | AvoidFutureJoinWithoutTimeout | concurrentnextgen.xml | 7f95c440 |
+| 9 | AvoidNonPrivateFieldsInSharedObjects | concurrentnextgen.xml | 7f95c440 |
+| 10 | AvoidMutableStaticFields | concurrentnextgen.xml | 7f95c440 |
+| 11 | AvoidStaticXmlFactories | concurrentnextgen.xml | 7f95c440 |
+| 12 | AvoidIncrementOrDecrementForVolatileField | concurrentnextgen.xml | 7f95c440 |
+| 13 | AvoidUnguardedAssignmentToNonFinalFieldsInSharedObjects | concurrentnextgen.xml | 7f95c440 |
+| 14 | AvoidCommonPoolForFutureAsync | concurrentnextgen.xml | 7f95c440 |
+| 15 | AvoidUnguardedAssignmentToNonFinalFieldsInObjectsUsingSynchronized | concurrentnextgen.xml | 7f95c440 |
+| 16 | AvoidUnguardedMutableFieldsInSharedObjects | concurrentnextgen.xml | 7f95c440 |
+| 17 | AvoidUnguardedMutableFieldsInObjectsUsingSynchronized | concurrentnextgen.xml | 7f95c440 |
+| 18 | AvoidUnguardedMutableInheritedFieldsInSharedObjects | concurrentnextgen.xml | (this commit) |
+| 19 | NotProperlySynchronizingOnThisWhileUsingGuardedBy | concurrentnextgen.xml | (this commit) |
+| 20 | NotProperlySynchronizingOnFieldWhileUsingGuardedBy | concurrentnextgen.xml | (this commit) |
+| 21 | WrongUseOfGuardedBy | concurrentnextgen.xml | (this commit) |
+| 22 | AvoidParallelFlux | concurrentnextgen.xml | (this commit) |
 
 ## Full remaining scope
 
@@ -70,9 +75,7 @@ AvoidSimpleDateFormat, AvoidStringBuffer, AvoidWideScopeXPathExpression, AvoidXP
 MDCPutWithoutRemove
 
 Remaining concurrent.xml rules:
-AvoidUnguardedMutableInheritedFieldsInSharedObjects, NotProperlySynchronizingOnThisWhileUsingGuardedBy,
-NotProperlySynchronizingOnFieldWhileUsingGuardedBy, WrongUseOfGuardedBy,
-AvoidParallelFlux, AvoidThreadUnsafeJaxbUsage, AvoidReactorOnEachOperator,
+AvoidThreadUnsafeJaxbUsage, AvoidReactorOnEachOperator,
 AvoidMDCInReactor, AvoidNonAtomicIfModifyOnConcurrentMap,
 AvoidUserDataInSharedObjects, AvoidVolatileInPrototypeScope,
 AvoidMutableCollectionInParallelStreamForEach
@@ -326,6 +329,32 @@ ignore/drop the concurrent.xml duplicate.**
       different signature, and is immune to any future soft-keyword-tokenization surprises (pitfall #3).
     - No upstream fix needed here — this was a case of using the wrong signature-string owner, not a
       `pmd-kotlin`/`kotlin-type-mapper` bug.
+
+14. **`FunctionValueParameter/Parameter` has no `@Identifier` attribute — another concrete instance of
+    pitfall #2, found in the second 5-rule batch.** The source branch repeatedly wrote
+    `ancestor::FunctionDeclaration//FunctionValueParameter/Parameter/@Identifier` to compare a
+    receiver/assignment-target identifier against the enclosing function's parameter names (to
+    exclude "it's just a local parameter, not the field" false positives). Since `Parameter` has no
+    `@Identifier` attribute (confirmed via `ast-dump`: the name lives at
+    `Parameter/SimpleIdentifier/T-Identifier/@Text`), the RHS of that `=` comparison was always an
+    empty node-set, so the comparison was always `false` and the surrounding `not(...)` exclusion
+    always evaluated `true` — i.e. the exclusion silently never excluded anything. This was *latent*
+    in 3 already-migrated rules from the first 5-rule batch
+    (`AvoidUnguardedAssignmentToNonFinalFieldsInSharedObjects`,
+    `AvoidUnguardedAssignmentToNonFinalFieldsInObjectsUsingSynchronized`,
+    `AvoidUnguardedMutableFieldsInSharedObjects`) — their existing test suites happened not to include
+    a "receiver is a function parameter with the same name as a field" case, so it went undetected
+    until a new test case in `AvoidUnguardedMutableInheritedFieldsInSharedObjects` (this batch)
+    surfaced it as a false positive ("no violation: mutator on function parameter" unexpectedly
+    flagged).
+    - **Fix**: replace every `.../Parameter/@Identifier` with
+      `.../Parameter/SimpleIdentifier/T-Identifier/@Text`. Fixed in all 4 occurrences across the
+      `concurrentnextgen.xml` file (the 3 latent ones plus the one introduced this batch).
+    - **Lesson reinforced**: a "found 0 violations when N expected" or (worse) a passing test suite
+      with a narrow set of test cases does NOT prove an exclusion clause is correct — a clause that
+      always evaluates to "not excluded" looks identical to a correctly-passing test until a test case
+      specifically targets the excluded scenario. Worth deliberately adding a test case for every
+      `not(@Text = ...)`-style exclusion clause, not just for the main positive/negative cases.
 
 ## Upstream PMD improvement ideas (tracked, not yet filed)
 

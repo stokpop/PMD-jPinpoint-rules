@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests https://pmd.sourceforge.io/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>violation: write to @GuardedBy("lock") field without synchronized(lock)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>9</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad1 {
+    private val lock = Any()
+
+    @GuardedBy("lock")
+    var txt: String = ""
+
+    fun setText(t: String) { txt = t } // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: read of @GuardedBy("lock") field without synchronized(lock)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>9</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad2 {
+    private val lock = Any()
+
+    @GuardedBy("lock")
+    var txt: String = ""
+
+    fun getText(): String { return txt } // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: synchronized on wrong lock</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>12</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad3 {
+    private val lock1 = Any()
+    private val lock2 = Any()
+
+    @GuardedBy("lock1")
+    var txt: String = ""
+
+    fun setText(t: String) {
+        synchronized(lock2) {
+            txt = t // bad - wrong lock
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: @Synchronized does not satisfy @GuardedBy("lock")</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>9</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad4 {
+    private val lock = Any()
+
+    @GuardedBy("lock")
+    var txt: String = ""
+
+    @Synchronized fun setText(t: String) { txt = t } // bad - @Synchronized uses "this", not "lock"
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: @GuardedBy value is not a field - value doesn't match any field name</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Bad5 {
+    @GuardedBy("nonExistent")
+    var txt: String = ""
+
+    fun setText(t: String) { txt = t } // bad - no matching lock field
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @GuardedBy("lock") with synchronized(lock)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Good1 {
+    private val lock = Any()
+
+    @GuardedBy("lock")
+    var txt: String = ""
+
+    fun getText(): String {
+        return synchronized(lock) { txt } // good
+    }
+    fun setText(t: String) {
+        synchronized(lock) { txt = t }    // good
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @GuardedBy("this") - not this rule</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Good2 {
+    @GuardedBy("this")
+    var txt: String = ""
+
+    fun setText(t: String) { txt = t } // not this rule's concern
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: framework annotation @Autowired</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+import org.springframework.beans.factory.annotation.Autowired
+
+class Good3 {
+    private val lock = Any()
+
+    @GuardedBy("lock")
+    var txt: String = ""
+
+    @Autowired
+    fun init(t: String) { txt = t } // good - framework injection
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: companion object field with synchronized(lock)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.GuardedBy
+
+class Good4 {
+    companion object {
+        private val lock = Any()
+
+        @GuardedBy("lock")
+        var shared: String = ""
+    }
+
+    fun setShared(t: String) {
+        synchronized(lock) { shared = t } // good
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

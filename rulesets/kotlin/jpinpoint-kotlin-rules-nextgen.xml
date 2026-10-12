@@ -470,6 +470,48 @@ class RootController {
         ]]></example>
     </rule>
 
+    <rule name="AvoidParallelFlux"
+          message="Avoid Flux.parallel for iterable sources: it divides data on CPU-count rails which is usually slower for non-CPU-intensive work."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ia12">
+        <description>Problem: With Reactor Flux.parallel.runOn, the data is divided on a number of 'rails' matching the number of CPU cores.
+            This is only useful in case much CPU processing is performed: if the sequential form takes more than 0,1 ms of CPU time.
+            With remote calls this is usually not the case. In addition, it introduces more complexity with risk of failures.
+            Solution: Remove parallel().runOn. Unless the CPU work takes more than 0,1 ms in sequential form and proves to be faster with parallelization.
+            So only for large collections and much CPU processing.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="bad-practice,cpu,jpinpoint-rule,multi-threading,performance,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Kotlin: AvoidParallelFlux. matchesSig() checks all call-suffixes within the same
+   method-chain PostfixUnaryExpression node, so this correctly flags only a
+   .fromIterable(...).parallel() chain, not either call in isolation. :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('reactor.core.publisher.Flux#parallel(*)')
+    and pmd-kotlin:matchesSig('reactor.core.publisher.Flux#fromIterable(*)')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import reactor.core.publisher.Flux
+import reactor.core.scheduler.Schedulers
+
+class Bad {
+    fun process(items: List<String>): Flux<String> =
+        Flux.fromIterable(items)
+            .parallel() // bad
+            .runOn(Schedulers.parallel())
+            .sequential()
+}
+        ]]>
+        </example>
+    </rule>
+
     <rule name="AvoidParallelStreamWithCommonPool"
           language="kotlin"
           message="Beware: parallelStream with the common pool is rarely a good choice."
@@ -602,7 +644,7 @@ class Bad {
     (: not a function parameter :)
     and not(
       not(ancestor::DirectlyAssignableExpression//T-Identifier[@Text='this'])
-      and @Text = ancestor::FunctionDeclaration//FunctionValueParameter/Parameter/@Identifier
+      and @Text = ancestor::FunctionDeclaration//FunctionValueParameter/Parameter/SimpleIdentifier/T-Identifier/@Text
     )
     (: not a local var :)
     and not(
@@ -724,7 +766,7 @@ class Good {
       and not(
         (: not a function parameter :)
         not(ancestor::DirectlyAssignableExpression//T-Identifier[@Text='this'])
-        and @Text = ancestor::FunctionDeclaration//FunctionValueParameter/Parameter/@Identifier
+        and @Text = ancestor::FunctionDeclaration//FunctionValueParameter/Parameter/SimpleIdentifier/T-Identifier/@Text
       )
       and not(
         (: not a local var (PropertyDeclaration inside FunctionBody) :)
@@ -743,7 +785,7 @@ class Good {
       (: and not a local var :)
       and not(@Text = ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration/@Identifier)
       (: and not a function parameter :)
-      and not(@Text = ancestor::FunctionDeclaration//FunctionValueParameter/Parameter/@Identifier)
+      and not(@Text = ancestor::FunctionDeclaration//FunctionValueParameter/Parameter/SimpleIdentifier/T-Identifier/@Text)
     )
   ]
   (: not inside a @Synchronized function :)
@@ -1065,6 +1107,386 @@ class BadMutableTypes {
         ]]></example>
     </rule>
 
+    <rule name="AvoidUnguardedMutableInheritedFieldsInSharedObjects"
+          language="kotlin"
+          message="Mutator method called on inherited field. Avoid unguarded mutable inherited fields in objects shared among threads. Make final immutable or access thread-safely AND use @GuardedBy."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#tutc07">
+        <description>
+            Problem: Multiple threads typically access fields of a singleton or may access fields in session scoped objects. If a (inherited) field or its reference is mutable, access is thread-unsafe and may cause corruption or visibility problems. It may also unintentionally mix-up session data.&#13;
+            Solution: Make the fields val and unmodifiable. If they really need to be mutable, make access thread-safe: use @Synchronized and @GuardedBy or @Volatile.&#13;
+            Notes:&#13;
+            1. Instances of Date, StringBuilder, URL and File are examples of mutable objects and should be avoided (or else guarded) as fields of shared objects.&#13;
+            2. Instances of classes like ArrayList, HashMap and HashSet are also mutable and should be properly wrapped or use thread-safe implementations like ConcurrentHashMap.&#13;
+            3. For autowiring/injection, the assignment of the reference is thread safe, so var is acceptable.&#13;
+            4. In case you are sure the Component is used in single threaded context only, annotate the class with @NotThreadSafe to make this explicit.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="data-mix-up,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Kotlin: AvoidUnguardedMutableInheritedFieldsInSharedObjects :)
+(: Detect mutator calls on inherited fields in singleton classes.
+   Rewritten into a single "//ClassDeclaration[...]//PostfixUnaryExpression[...]" path - the
+   source branch had two disconnected top-level expressions (same pitfall as the other
+   AvoidUnguarded* rules in this file), which is invalid for a single rule xpath property. :)
+//ClassDeclaration[
+  (
+       pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Repository')
+    or pmd-kotlin:hasAnnotation('org.springframework.web.bind.annotation.RestController')
+  )
+  (: exclude request/prototype scope :)
+  and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
+  and not(
+      pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Scope')
+      and .//Annotation[.//SimpleIdentifier/*/@Text='Scope']//T-LineStrText[@Text='request' or @Text='prototype']
+  )
+  (: exclude @NotThreadSafe :)
+  and not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
+  (: exclude @ConfigurationProperties unless has Setter annotation :)
+  and not(
+    (pmd-kotlin:hasAnnotation('org.springframework.boot.context.properties.ConfigurationProperties'))
+    and not(pmd-kotlin:hasAnnotation('lombok.Setter'))
+  )
+  (: class must have a supertype (extends a class or implements interface) :)
+  and .//DelegationSpecifier
+]//PostfixUnaryExpression[
+  (: has a navigation suffix with a mutator method name :)
+  (: NavigationSuffix has no @Identifier attribute - the method name is nested under
+     SimpleIdentifier/T-Identifier/@Text (confirmed via ast-dump); the source branch's
+     matches(@Identifier, ...) was always false, a genuine dead-code bug. :)
+  PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[matches(@Text, '^(set|put|clear|add|remove|replace)')]
+  (: followed by a call suffix (it's actually a method call) :)
+  and PostfixUnarySuffix/CallSuffix
+  (: the receiver is a simple identifier :)
+  and PrimaryExpression/SimpleIdentifier/T-Identifier[
+    (: not a field declared in this class :)
+    not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
+    (: not a function parameter - Parameter has no @Identifier attribute, the name is
+       nested under SimpleIdentifier/T-Identifier/@Text (confirmed via ast-dump) :)
+    and not(@Text = ancestor::FunctionDeclaration[1]//FunctionValueParameter/Parameter/SimpleIdentifier/T-Identifier/@Text)
+    (: not a local variable :)
+    and not(@Text = ancestor::FunctionBody[1]//PropertyDeclaration/VariableDeclaration/@Identifier)
+  ]
+  (: not inside a @Synchronized function :)
+  and not(ancestor::FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized')])
+  (: not inside a synchronized {} block - matchesSig is more robust than identifier-text
+     matching, see the AvoidUnguardedAssignmentToNonFinalFieldsInSharedObjects note. :)
+  and not(ancestor::PostfixUnaryExpression[pmd-kotlin:matchesSig('kotlin#synchronized(_,_)')])
+  (: not inside framework-annotated functions :)
+  and not(ancestor::FunctionDeclaration[
+       pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
+  ])
+  (: not in afterPropertiesSet function :)
+  and not(ancestor::FunctionDeclaration[SimpleIdentifier/T-Identifier[@Text='afterPropertiesSet']])
+  (: not in a nested object declaration :)
+  and not(ancestor::ObjectDeclaration[ancestor::ClassBody])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+@org.springframework.stereotype.Component
+class Bad : SomeParent() {
+    fun mutateDateBad() {
+        date.setTime(100) // bad - unguarded mutator on inherited field
+    }
+    fun mutateMapBad(key: String, value: String) {
+        map.put(key, value) // bad - unguarded mutator on inherited field
+    }
+}
+
+@org.springframework.stereotype.Component
+class Good : SomeParent() {
+    @Synchronized
+    fun mutateMapGood(key: String, value: String) {
+        map.put(key, value) // good - synchronized
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="NotProperlySynchronizingOnFieldWhileUsingGuardedBy"
+          language="kotlin"
+          message="Not properly synchronizing access of field while using @GuardedBy(field)"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://jcip.net/annotations/doc/index.html">
+        <description>
+            Problem: The field to which the `@GuardedBy` annotation is applied is not accessed thread-safely as promised by GuardedBy.&#13;
+            Solution: Make access thread-safe: synchronize access by a `synchronized(lock)` block with `lock` being a private val field.&#13;
+            Note that methods with annotations `@Autowired`, `@PostConstruct`, `@BeforeStep`, `@Value` and `@Inject` are ignored.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Kotlin: NotProperlySynchronizingOnFieldWhileUsingGuardedBy :)
+(: Two parts: :)
+(: 1. @GuardedBy value IS a field name -> check synchronized(field) :)
+(: 2. @GuardedBy value is NOT "this" and NOT a field -> always flag :)
+
+(: Part 1: Writes to @GuardedBy(fieldLock) fields not inside synchronized(fieldLock) :)
+//FunctionDeclaration[
+  ancestor::ClassBody
+  and not(
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
+  )
+]//Assignment[
+  (: assignment target matches a @GuardedBy(fieldName) field where fieldName IS a property :)
+  (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
+    @Text = ancestor::ClassBody[1]//PropertyDeclaration[
+      not(ancestor::FunctionBody)
+      and pmd-kotlin:hasAnnotation('GuardedBy')
+      and .//T-LineStrText[
+        not(@Text = 'this')
+        and @Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier
+      ]
+    ]/VariableDeclaration/@Identifier
+  ]
+  (: not inside synchronized(lockField) where lockField matches the @GuardedBy value :)
+  and not(
+    ancestor::PostfixUnaryExpression[
+      pmd-kotlin:matchesSig('kotlin#synchronized(_,_)')
+      and .//CallSuffix/ValueArguments//T-Identifier/@Text =
+        ancestor::ClassBody[1]//PropertyDeclaration[
+          not(ancestor::FunctionBody)
+          and pmd-kotlin:hasAnnotation('GuardedBy')
+        ]//T-LineStrText/@Text
+    ]
+  )
+]
+|
+(: Part 1b: Reads of @GuardedBy(fieldLock) fields not inside synchronized(fieldLock) :)
+//FunctionDeclaration[
+  ancestor::ClassBody
+  and not(
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
+  )
+]//PrimaryExpression[
+  ancestor::FunctionBody
+  and SimpleIdentifier/T-Identifier[
+    @Text = ancestor::ClassBody[1]//PropertyDeclaration[
+      not(ancestor::FunctionBody)
+      and pmd-kotlin:hasAnnotation('GuardedBy')
+      and .//T-LineStrText[
+        not(@Text = 'this')
+        and @Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier
+      ]
+    ]/VariableDeclaration/@Identifier
+  ]
+  and not(parent::PostfixUnaryExpression/PostfixUnarySuffix/CallSuffix)
+  and not(
+    ancestor::PostfixUnaryExpression[
+      pmd-kotlin:matchesSig('kotlin#synchronized(_,_)')
+      and .//CallSuffix/ValueArguments//T-Identifier/@Text =
+        ancestor::ClassBody[1]//PropertyDeclaration[
+          not(ancestor::FunctionBody)
+          and pmd-kotlin:hasAnnotation('GuardedBy')
+        ]//T-LineStrText/@Text
+    ]
+  )
+]
+|
+(: Part 2: @GuardedBy value is NOT "this" and NOT a field name -> always flag writes :)
+//FunctionDeclaration[
+  ancestor::ClassBody
+  and not(
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
+  )
+]//Assignment[
+  (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
+    @Text = ancestor::ClassBody[1]//PropertyDeclaration[
+      not(ancestor::FunctionBody)
+      and pmd-kotlin:hasAnnotation('GuardedBy')
+      and .//T-LineStrText[
+        not(@Text = 'this')
+        and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
+      ]
+    ]/VariableDeclaration/@Identifier
+  ]
+]
+|
+(: Part 2b: same for reads :)
+//FunctionDeclaration[
+  ancestor::ClassBody
+  and not(
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
+  )
+]//PrimaryExpression[
+  ancestor::FunctionBody
+  and SimpleIdentifier/T-Identifier[
+    @Text = ancestor::ClassBody[1]//PropertyDeclaration[
+      not(ancestor::FunctionBody)
+      and pmd-kotlin:hasAnnotation('GuardedBy')
+      and .//T-LineStrText[
+        not(@Text = 'this')
+        and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
+      ]
+    ]/VariableDeclaration/@Identifier
+  ]
+  and not(parent::PostfixUnaryExpression/PostfixUnarySuffix/CallSuffix)
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad {
+    private val lock = Any()
+    @GuardedBy("lock")
+    var txt: String = ""
+
+    fun getText(): String { return txt } // bad
+    fun setText(t: String) { txt = t }   // bad, not synchronized on lock
+}
+
+class Good {
+    private val lock = Any()
+    @GuardedBy("lock")
+    var txt: String = ""
+
+    fun getText(): String {
+        return synchronized(lock) { txt } // good
+    }
+    fun setText(t: String) {
+        synchronized(lock) { txt = t }    // good
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="NotProperlySynchronizingOnThisWhileUsingGuardedBy"
+          language="kotlin"
+          message="Not properly synchronizing access of field while using @GuardedBy('this')"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://jcip.net/annotations/doc/index.html">
+        <description>
+            Problem: The field to which this annotation is applied should only be accessed when holding the built-in 'this' lock by using synchronized.&#13;
+            Solution: Make access thread-safe: synchronize access by @Synchronized method annotation or a synchronized(this) block.&#13;
+            Note that methods with annotations @Autowired, @PostConstruct, @BeforeStep, @Value and @Inject are ignored.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Kotlin: NotProperlySynchronizingOnThisWhileUsingGuardedBy :)
+(: Detect access to @GuardedBy("this") fields outside @Synchronized or synchronized(this) :)
+
+(: Writes: assignments to @GuardedBy("this") fields :)
+//FunctionDeclaration[
+  ancestor::ClassBody
+  and not(
+    pmd-kotlin:hasAnnotation('Synchronized')
+  )
+  and not(
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
+  )
+]//Assignment[
+  (: assignment target matches a @GuardedBy("this") field :)
+  (DirectlyAssignableExpression|AssignableExpression)//T-Identifier[
+    @Text = ancestor::ClassBody[1]//PropertyDeclaration[
+      not(ancestor::FunctionBody)
+      (: hasAnnotation() must be called with the annotated declaration as context,
+         not on a descendant Annotation node (that always evaluates to false) :)
+      and pmd-kotlin:hasAnnotation('GuardedBy')
+      and .//T-LineStrText[@Text='this']
+    ]/VariableDeclaration/@Identifier
+  ]
+  (: not inside synchronized(this) block - matchesSig identifies the call, the lock
+     argument is still checked textually since it is a plain identifier reference. :)
+  and not(ancestor::PostfixUnaryExpression[
+      pmd-kotlin:matchesSig('kotlin#synchronized(_,_)')
+      and .//CallSuffix/ValueArguments//T-Identifier[@Text='this']
+  ])
+]
+|
+(: Reads: PrimaryExpression references to @GuardedBy("this") fields :)
+//FunctionDeclaration[
+  ancestor::ClassBody
+  and not(
+    pmd-kotlin:hasAnnotation('Synchronized')
+  )
+  and not(
+    pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('PostConstruct')
+    or pmd-kotlin:hasAnnotation('org.springframework.batch.core.annotation.BeforeStep')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
+  )
+]//PrimaryExpression[
+  (: must be inside function body :)
+  ancestor::FunctionBody
+  and SimpleIdentifier/T-Identifier[
+    @Text = ancestor::ClassBody[1]//PropertyDeclaration[
+      not(ancestor::FunctionBody)
+      and pmd-kotlin:hasAnnotation('GuardedBy')
+      and .//T-LineStrText[@Text='this']
+    ]/VariableDeclaration/@Identifier
+  ]
+  (: not a function call (function name followed by CallSuffix) :)
+  and not(parent::PostfixUnaryExpression/PostfixUnarySuffix/CallSuffix)
+  (: not inside synchronized(this) block :)
+  and not(ancestor::PostfixUnaryExpression[
+      pmd-kotlin:matchesSig('kotlin#synchronized(_,_)')
+      and .//CallSuffix/ValueArguments//T-Identifier[@Text='this']
+  ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad {
+    @GuardedBy("this")
+    var txt: String = ""
+
+    fun getText(): String { return txt } // bad - not synchronized
+    fun setText(t: String) { txt = t }   // bad - not synchronized
+}
+
+class Good {
+    @GuardedBy("this")
+    var txt: String = ""
+
+    @Synchronized
+    fun getText(): String { return txt } // good
+    @Synchronized
+    fun setText(t: String) { txt = t }   // good
+}
+        ]]></example>
+    </rule>
+
     <rule name="SynchronizingForLocalVars"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
@@ -1113,6 +1535,83 @@ class SyncService {
             localVar = "updated" // bad
         }
         return localVar
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="WrongUseOfGuardedBy"
+          language="kotlin"
+          message="@GuardedBy or locking is used in a wrong way, this may indicate a concurrency bug."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#tutc14">
+        <description>
+            Problem: Wrong use of locking and '@GuardedBy' may result in thread-unsafety and concurrency bugs. It may obstruct other GuardedBy rules which check whether the promise of guarding is actually met, it may disguise high-risk violations.&#13;
+            Solution: Use '@GuardedBy' properly: use a private val lock object; a String literal of the lock name as '@GuardedBy' argument; and use that explicit or 'this' lock with 'synchronized'.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,confusing,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Kotlin: WrongUseOfGuardedBy :)
+
+(: Check 1: @GuardedBy argument is not a String literal :)
+//PropertyDeclaration[not(ancestor::FunctionBody) and pmd-kotlin:hasAnnotation('GuardedBy')]
+  //Annotation
+    [.//ValueArguments/ValueArgument[not(.//LineStringLiteral)]]
+
+|
+(: Check 2: @GuardedBy value refers to non-existent field, not "this" :)
+//PropertyDeclaration[not(ancestor::FunctionBody) and pmd-kotlin:hasAnnotation('GuardedBy')]
+  //T-LineStrText[
+      not(@Text = 'this')
+      and not(@Text = ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody)]/VariableDeclaration/@Identifier)
+    ]
+
+|
+(: Check 3: @GuardedBy("this") but no @Synchronized method and no synchronized(this) call in class :)
+//PropertyDeclaration[not(ancestor::FunctionBody) and pmd-kotlin:hasAnnotation('GuardedBy')]
+  //T-LineStrText[@Text = 'this'
+      and not(ancestor::ClassBody[1]//FunctionDeclaration[
+        pmd-kotlin:hasAnnotation('Synchronized')
+      ])
+      and not(ancestor::ClassBody[1]//PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('kotlin#synchronized(_,_)')
+        and .//CallSuffix/ValueArguments//T-Identifier[@Text='this']
+      ])
+    ]
+
+|
+(: Check 4: Lock field used in @GuardedBy is not private val :)
+//PropertyDeclaration[
+  not(ancestor::FunctionBody)
+  (: this property is referenced by a @GuardedBy annotation :)
+  and VariableDeclaration/@Identifier =
+    ancestor::ClassBody[1]//PropertyDeclaration[not(ancestor::FunctionBody) and pmd-kotlin:hasAnnotation('GuardedBy')]
+      //T-LineStrText/@Text
+  (: but it is not private val :)
+  and (@Mutable = true() or not(pmd-kotlin:modifiers() = 'private'))
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class WrongUseOfGuardedBy {
+    companion object { const val FIELD = "field" }
+    @GuardedBy(FIELD) // bad, not a String literal
+    var cachedData: MutableMap<String, String> = HashMap()
+}
+
+class RightUseOfGuardedBy {
+    private val lock = Any()
+
+    @GuardedBy("lock") // good, String literal referring to existing private val lock
+    var cachedData: MutableMap<String, String> = HashMap()
+
+    fun getValue(key: String): String? {
+        return synchronized(lock) { cachedData[key] }
     }
 }
         ]]></example>
