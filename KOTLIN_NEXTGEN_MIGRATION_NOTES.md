@@ -17,7 +17,7 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 
 ## Status (as of this note)
 
-32 of ~103 candidate rule changes migrated and committed, all tests green:
+37 of ~103 candidate rule changes migrated and committed, all tests green:
 
 | # | Rule | Nextgen file | Commit |
 |---|------|--------------|--------|
@@ -48,11 +48,16 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 | 25 | AvoidMDCInReactor | concurrentnextgen.xml | c5d1a8aa |
 | 26 | AvoidNonAtomicIfModifyOnConcurrentMap | concurrentnextgen.xml | c5d1a8aa |
 | 27 | AvoidUserDataInSharedObjects | concurrentnextgen.xml | c5d1a8aa |
-| 28 | AvoidVolatileInPrototypeScope | concurrentnextgen.xml | (this commit) |
-| 29 | AvoidMutableCollectionInParallelStreamForEach | concurrentnextgen.xml | (this commit) |
-| 30 | AvoidXMLGregorianCalendar | remotingnextgen.xml | (this commit) |
-| 31 | AvoidObjectMapperAsField | remotingnextgen.xml | (this commit) |
-| 32 | ObjectMapperCreatedForEachMethodCall | remotingnextgen.xml | (this commit) |
+| 28 | AvoidVolatileInPrototypeScope | concurrentnextgen.xml | 00e30c73 |
+| 29 | AvoidMutableCollectionInParallelStreamForEach | concurrentnextgen.xml | 00e30c73 |
+| 30 | AvoidXMLGregorianCalendar | remotingnextgen.xml | 00e30c73 |
+| 31 | AvoidObjectMapperAsField | remotingnextgen.xml | 00e30c73 |
+| 32 | ObjectMapperCreatedForEachMethodCall | remotingnextgen.xml | 00e30c73 |
+| 33 | GsonCreatedForEachMethodCall | remotingnextgen.xml | (this commit) |
+| 34 | BufferingClientHttpRequestFactoryIsMemoryGreedy | remotingnextgen.xml | (this commit) |
+| 35 | AvoidHttpHostOneArgumentConstructor | remotingnextgen.xml | (this commit) |
+| 36 | AvoidJAXBUtil | remotingnextgen.xml | (this commit) |
+| 37 | JAXBContextCreatedForEachMethodCall | remotingnextgen.xml | (this commit) |
 
 ## Full remaining scope
 
@@ -88,11 +93,12 @@ Remaining concurrent.xml rules: none
 (NB: `SetQueueCapacityForTaskExecutor` also appears under concurrent.xml in the source branch, but is
 a stale duplicate — resolved below, only the remoting.xml version is migrated)
 
-Remaining remoting.xml rules: GsonCreatedForEachMethodCall,
-HttpClientBuilderWithoutDisableConnectionState, HttpClientBuilderWithoutTimeouts,
-AvoidDeprecatedHystrix, HttpClientBuilderWithoutPoolSize, NettyConnectionProviderWithoutMaxOrTimeout,
-BufferingClientHttpRequestFactoryIsMemoryGreedy, AvoidHttpHostOneArgumentConstructor, AvoidJAXBUtil,
-JAXBContextCreatedForEachMethodCall, AvoidReactorDebugOverhead, AvoidRecreatingHttpClient,
+Remaining remoting.xml rules (all genuinely NEW; the base remoting.xml only has HttpClientBuilderWithoutDisableConnectionState,
+HttpClientBuilderWithoutTimeouts, AvoidDeprecatedHystrix, HttpClientBuilderWithoutPoolSize and
+NettyConnectionProviderWithoutMaxOrTimeout, which are long-standing, newer than the kotlin-type-mapper
+versions and use no overlay - DO NOT migrate those 5; the type-mapper versions rely on a nonexistent
+@Identifier on NavigationSuffix/PrimaryExpression and fail 14 tests):
+AvoidReactorDebugOverhead, AvoidRecreatingHttpClient,
 AvoidLeakingRetryEventConsumers, RetryCanCauseOverload, AvoidModifyingObjectMapper,
 AvoidDeprecatedHttpConnectors, DefaultFeignClientWithoutTLSConnectionReuse,
 AvoidHardcodedConnectionConfig, HttpClientImproperConnectionTimeouts, UseCloseableForHttpClient,

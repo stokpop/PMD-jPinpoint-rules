@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: JAXBContext.newInstance in function body (javax)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.bind.JAXBContext
+
+class Bad {
+    fun marshal(obj: Any): String {
+        val ctx = JAXBContext.newInstance(obj::class.java) // bad: recreated per call
+        return ctx.createMarshaller().run { java.io.StringWriter().also { marshal(obj, it) }.toString() }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: JAXBContext.newInstance in lambda per element (javax)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.bind.JAXBContext
+
+fun marshalAll(items: List<Any>): List<String> =
+    items.map {
+        JAXBContext.newInstance(it::class.java) // bad: recreated per element
+            .createMarshaller()
+            .run { java.io.StringWriter().also { w -> marshal(it, w) }.toString() }
+    }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: JAXBContext.newInstance single-expression top-level function (jakarta)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+import jakarta.xml.bind.JAXBContext
+
+fun newCtx(clazz: Class<*>) = JAXBContext.newInstance(clazz) // bad: caller recreates every call
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: JAXBContext cached in companion object val</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.bind.JAXBContext
+
+class GoodCompanion {
+    companion object {
+        private val CTX = JAXBContext.newInstance(GoodCompanion::class.java) // ok: created once
+    }
+    fun marshal(obj: Any): String =
+        CTX.createMarshaller().run { java.io.StringWriter().also { marshal(obj, it) }.toString() }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: JAXBContext as lazy-initialized top-level property</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.bind.JAXBContext
+
+private val CTX by lazy { JAXBContext.newInstance(String::class.java) } // ok: initialized once
+
+fun marshal(obj: String) = CTX.createMarshaller()
+        ]]></code>
+    </test-code>
+
+</test-data>

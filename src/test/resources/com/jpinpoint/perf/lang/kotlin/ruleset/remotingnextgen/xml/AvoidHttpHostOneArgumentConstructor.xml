@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: HttpHost with only hostname in function body</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.HttpHost
+
+class Bad {
+    fun createHost(name: String): HttpHost {
+        return HttpHost(name) // bad: default port -1, no protocol
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: HttpHost with only hostname as top-level function single-expression</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.HttpHost
+
+fun createHost(name: String) = HttpHost(name) // bad
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: HttpHost with only hostname in lambda</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.HttpHost
+
+fun createHosts(names: List<String>): List<HttpHost> =
+    names.map {
+        HttpHost(it) // bad: created per element without port/protocol
+    }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: HttpHost with hostname and port</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.http.HttpHost
+
+fun createHost(name: String) = HttpHost(name, 443)
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: HttpHost with hostname, port and protocol</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.http.HttpHost
+
+fun createHosts(names: List<String>): List<HttpHost> =
+    names.map { HttpHost(it, 443, "https") }
+        ]]></code>
+    </test-code>
+
+</test-data>
