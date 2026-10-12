@@ -57,6 +57,565 @@
     </rule>
 
 <!-- END Included file 'commonnextgen.xml' -->
+<!-- BEGIN Included file 'concurrentnextgen.xml' -->
+    <rule name="AvoidCommonPoolForBlockingCalls"
+          message="Avoid parallelStream() for blocking (remote) calls; it uses the ForkJoinPool common pool which can starve other tasks."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#cac10">
+        <description>Problem: parallelStream() uses the ForkJoinPool common pool (shared JVM-wide). Blocking calls (HTTP, DB) starve it.
+            Solution: Use a dedicated ForkJoinPool (submit your parallel work to it), or use Kotlin coroutines with IO dispatcher.
+            (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//KotlinFile[
+    ImportList/ImportHeader[
+        starts-with(@Name, 'org.springframework.web.client')
+        or starts-with(@Name, 'org.apache.commons.httpclient')
+        or starts-with(@Name, 'org.apache.http')
+    ]
+]//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.Collection#parallelStream()')
+    and not(ancestor::LambdaLiteral[
+        ancestor::PostfixUnaryExpression[pmd-kotlin:matchesSig('java.util.concurrent.ForkJoinPool#submit(*)')]
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.springframework.web.client.RestTemplate
+class Service(val restTemplate: RestTemplate) {
+    val items = listOf("a", "b")
+    fun bad() = items.parallelStream().forEach { restTemplate.getForObject("/api/$it", String::class.java) } // bad: blocks common pool
+    fun good() = kotlinx.coroutines.runBlocking { items.map { kotlinx.coroutines.async(kotlinx.coroutines.Dispatchers.IO) { restTemplate.getForObject("/api/$it", String::class.java) } }.map { it.await() } } // ok: IO dispatcher
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidCompletionServiceTake"
+          language="kotlin"
+          message="Avoid completionService.take, use poll"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md">
+        <description>
+            Problem: take() stalls indefinitely in case of hanging threads and consumes a thread.&#13;
+            Solution: use poll() with a timeout value and handle the timeout.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.concurrent.CompletionService#take()')
+    and ./PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='take']
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun collectBad(completionService: CompletionService<List<Any>>): Future<List<Any>> {
+    return completionService.take() // bad
+}
+
+fun collectGood(completionService: CompletionService<List<Any>>): Future<List<Any>>? {
+    return completionService.poll(3L, TimeUnit.SECONDS) // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidExecutorInvokeWithoutTimeout"
+          language="kotlin"
+          message="Avoid using ExecutorService::invokeAll or invokeAny without a timeout."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ia15">
+        <description>Problem: Stalls indefinitely in case of stalled Callable(s) and consumes threads.
+            Solution: Provide a timeout to the invokeAll/invokeAny method and handle the timeout. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) = 1
+    and (
+        pmd-kotlin:matchesSig('java.util.concurrent.ExecutorService#invokeAll(*)')
+        or pmd-kotlin:matchesSig('java.util.concurrent.ExecutorService#invokeAny(*)')
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+
+class TaskRunner {
+    fun invokeAllBad(executor: ExecutorService, callables: Collection<Callable<String>>): List<Future<String>> {
+        return executor.invokeAll(callables) // bad
+    }
+
+    fun invokeAllGood(executor: ExecutorService, callables: Collection<Callable<String>>): List<Future<String>> {
+        return executor.invokeAll(callables, 30, TimeUnit.SECONDS) // good
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidFutureGetWithoutTimeout"
+          language="kotlin"
+          message="Avoid future.get without timeout"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ia06">
+        <description>
+            Problem: Stalls indefinitely in case of hanging threads and consumes a thread.&#13;
+            Solution: Provide a timeout value and handle the timeout.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.concurrent.Future#get()')
+    (: 'get' is a Kotlin soft keyword (property getter), tokenized as T-GET not T-Identifier; use a wildcard :)
+    and ./PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*[@Text='get']
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun bad(complFuture: CompletableFuture<String>): String {
+    return complFuture.get() // bad
+}
+
+fun good(complFuture: CompletableFuture<String>): String {
+    return complFuture.get(10, TimeUnit.SECONDS) // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidFutureJoinWithoutTimeout"
+          language="kotlin"
+          message="Avoid future.join without timeout"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ia07">
+        <description>
+            Problem: Stalls indefinitely in case of hanging thread(s) and consumes a thread.&#13;
+            Solution: Provide a timeout before the join and handle the timeout. For example a future.get(timeout, unit), an orTimeout() or a completeOnTimeout(). You may want to use CompletableFuture.allOf() too.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: future.join() without any timeout method anywhere in the same function body.
+   The extra "PostfixUnarySuffix/NavigationSuffix/.../@Text = 'join'" check (direct child, not
+   descendant) is NOT redundant here, despite matchesSig() already identifying the signature:
+   confirmed via ast-dump that matchesSig('...Future#join()') spuriously also returns true for
+   OUTER ancestor PostfixUnaryExpression nodes of a multi-line method chain with a trailing lambda
+   (e.g. the whole "return futures.filter{...}.map{it.join()}" expression), even though .join() is
+   nested three levels deep inside an unrelated lambda body, not a direct suffix of that outer node.
+   This looks like the same class of line/position-based type-attribution bug as
+   stokpop/kotlin-type-mapper#36 and PMD PR #7168 (type/call info leaking onto a neighbouring or
+   enclosing declaration for multi-line constructs). The extra check scopes the match back down to
+   the exact node whose own immediate suffix is the ".join()" call. :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.concurrent.Future#join()')
+    and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = 'join'
+    and not(
+        ancestor::FunctionBody//PostfixUnaryExpression[
+            pmd-kotlin:matchesSig('java.util.concurrent.Future#get(_,java.util.concurrent.TimeUnit)')
+            or pmd-kotlin:matchesSig('java.util.concurrent.CompletableFuture#orTimeout(_,java.util.concurrent.TimeUnit)')
+            or pmd-kotlin:matchesSig('java.util.concurrent.CompletableFuture#completeOnTimeout(_,_,java.util.concurrent.TimeUnit)')
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun getOrdersBad(futures: List<CompletableFuture<Order>>): List<Order> {
+    return futures
+        .filter { it.isDone && !it.isCompletedExceptionally }
+        .map { it.join() } // bad, no timeout provided
+}
+
+fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
+    val allResult = CompletableFuture.allOf(*futures.toTypedArray())
+    try {
+        allResult.get(5L, TimeUnit.SECONDS) // good - timeout
+    } catch (e: Exception) { }
+    return futures
+        .filter { it.isDone && !it.isCompletedExceptionally }
+        .map { it.join() } // good - timeout provided above
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidIncrementOrDecrementForVolatileField"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid ++, --, +=, -= for volatile fields"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#tutc09">
+        <description>Problem: Compound operations on volatile fields are not atomic.
+            Solution: Use AtomicInteger or another atomic type, or guard the updates. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PostfixUnarySuffix[PostfixUnaryOperator]
+    and PrimaryExpression/SimpleIdentifier/*/@Text = ancestor::ClassBody[1]//PropertyDeclaration[
+            pmd-kotlin:hasAnnotation('Volatile')
+        ]/VariableDeclaration/@Identifier
+]
+|
+//Assignment[
+    AssignmentAndOperator
+    and (DirectlyAssignableExpression|AssignableExpression)//SimpleIdentifier/*/@Text = ancestor::ClassBody[1]//PropertyDeclaration[
+            pmd-kotlin:hasAnnotation('Volatile')
+        ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Counter {
+    @Volatile
+    private var counter = 0
+
+    fun bad() {
+        counter++ // bad
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidMutableStaticFields"
+          message="Avoid mutable static fields. Make val (immutable) or use thread-safe access with @Volatile or @GuardedBy."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#isc01">
+        <description>Problem: Multiple threads typically access static fields. Unguarded assignment to a mutable or non-final static field is thread-unsafe and may cause corruption or visibility problems. To make this thread-safe, that is, guard the field e.g. with synchronized methods, may cause contention.
+            Solution: Make the fields final and unmodifiable. If they really need to be mutable, make access thread-safe: use synchronized and @GuardedBy, use volatile or a suitable concurrent collection type. Consider lock contention.
+            (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: isWithin pattern: companion-object field, excluding function-body/lambda-local vars :)
+//CompanionObject//PropertyDeclaration[
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and @Mutable = true()
+    and not(pmd-kotlin:hasAnnotation('Volatile'))
+    and not(pmd-kotlin:hasAnnotation('GuardedBy'))
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+class Bad {
+    companion object {
+        var count: Int = 0 // bad: mutable static field
+    }
+}
+class Good {
+    companion object {
+        val MAX: Int = 100 // ok: immutable
+        @Volatile
+        var running: Boolean = false // ok: volatile
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidNonPrivateFieldsInSharedObjects"
+          language="kotlin"
+          message="Avoid non-private properties in shared objects. Make properties private to ensure thread-safety."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#tutc11">
+        <description>
+            Problem: A singleton, or more general: an object shared among threads, has a property that is not private.
+            These properties can possibly be modified from other classes.&#13;
+            Solution: Make the properties private.
+            Note: properties are excluded when annotated with: @Autowired/@Value/@Inject.
+            (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Kotlin: AvoidNonPrivateFieldsInSharedObjects :)
+(: Find non-private properties in singleton/shared-object classes :)
+
+(: Match classes annotated as singletons/shared objects, then find non-private, non-val
+   class-level properties within them :)
+//ClassDeclaration[
+  (
+       pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller')
+    or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Repository')
+    or pmd-kotlin:hasAnnotation('org.springframework.web.bind.annotation.RestController')
+  )
+  (: exclude request/prototype scope — not shared :)
+  and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
+  (: exclude @Scope("request") or @Scope("prototype").
+     Note: pmd-kotlin:hasAnnotation()/typeIs() only resolve correctly when called on the
+     annotated declaration node (here ClassDeclaration), NOT on the Annotation node itself
+     (confirmed empirically - calling them directly on an Annotation node always returns false).
+     So the class-level hasAnnotation() check above guards that a real, resolvable Spring
+     @Scope annotation is present, and we separately pick out the specific Annotation node by
+     its literal name 'Scope' to read its string argument - this also prevents a false
+     exclusion from an unrelated annotation whose argument happens to contain the text
+     "request"/"prototype" (e.g. @RequestMapping("request")). :)
+  and not(
+      pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Scope')
+      and .//Annotation[.//SimpleIdentifier/*/@Text='Scope']//T-LineStrText[@Text='request' or @Text='prototype']
+  )
+  (: exclude @NotThreadSafe :)
+  and not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
+]//PropertyDeclaration[
+  (: not inside a function body — class-level property (: isWithin pattern :) :)
+  not(ancestor::FunctionBody)
+  (: not private — modifiers() returns a sequence (e.g. a property can be both 'private' and
+     'lateinit' at once), so '=' here is an existential "contains" check, not scalar equality :)
+  and not(pmd-kotlin:modifiers()='private')
+  (: not val (final) :)
+  and not(T-VAL)
+  (: not injection framework annotated :)
+  and not(
+       pmd-kotlin:hasAnnotation('Autowired')
+    or pmd-kotlin:hasAnnotation('Value')
+    or pmd-kotlin:hasAnnotation('Inject')
+  )
+  (: not in a nested class inside the class body :)
+  and not(ancestor::ClassDeclaration[ancestor::ClassBody])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+@Controller
+class RootController {
+
+    var baskets: List<Any> = listOf()          // bad, not private
+    protected var baskets2: List<Any> = listOf() // bad, not private
+    val baskets3: List<Any> = listOf()          // good, val (final)
+    private var baskets4: List<Any> = listOf()  // good, private
+
+    @Autowired
+    lateinit var baskets5: List<Any>           // allowed, injected
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidParallelStreamWithCommonPool"
+          language="kotlin"
+          message="Beware: parallelStream with the common pool is rarely a good choice."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ia11">
+        <description>Problem: Collection.parallelStream uses the common pool, with #threads = #CPUs. It is designed to distribute much CPU work over the cores. It is not designed for remote calls or other blocking calls.
+            In addition, parallelizing has CPU overhead and concurrency risks.
+            Solution: Prefer sequential streams or Kotlin sequences, or use a dedicated pool when parallelism is justified. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,multi-threading,performance,sustainability-medium,unpredictable" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) = 0
+    and (
+        pmd-kotlin:matchesSig('java.util.Collection#parallelStream(*)')
+        or pmd-kotlin:matchesSig('java.util.stream.BaseStream#parallel(*)')
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class StreamService {
+    fun bad(list: List<String>) {
+        list.parallelStream().forEach { println(it) } // bad
+    }
+
+    fun good(list: List<String>) {
+        list.asSequence().forEach { println(it) } // good
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidStaticXmlFactories"
+          message="XML Factory is used as static/object/companion field. XML factories are not thread-safe. Use local variables instead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#IUOXAR09">
+        <description>An XML Factory like DocumentBuilderFactory, TransformerFactory, MessageFactory is used as static field. Problem: These factory objects are typically not thread-safe and rather expensive to create because of class loading.
+            Solution: Create the Factories as local variables and use command line arguments to specify the implementation class. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: isWithin pattern: companion object / object declaration / direct top-level property,
+   excluding function-body/lambda-local vars. "top-level" means a property whose direct
+   parent chain is Declaration/TopLevelObject (i.e. not nested inside any class/object body) :)
+//PropertyDeclaration[
+    (ancestor::CompanionObject or ancestor::ObjectDeclaration or parent::Declaration/parent::TopLevelObject)
+    and not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and (
+        pmd-kotlin:typeIs('javax.xml.parsers.DocumentBuilderFactory')
+        or pmd-kotlin:typeIs('javax.xml.parsers.SAXParserFactory')
+        or pmd-kotlin:typeIs('javax.xml.stream.XMLInputFactory')
+        or pmd-kotlin:typeIs('javax.xml.stream.XMLOutputFactory')
+        or pmd-kotlin:typeIs('javax.xml.stream.XMLEventFactory')
+        or pmd-kotlin:typeIs('javax.xml.transform.TransformerFactory')
+        or pmd-kotlin:typeIs('javax.xml.validation.SchemaFactory')
+        or pmd-kotlin:typeIs('javax.xml.datatype.DatatypeFactory')
+        or pmd-kotlin:typeIs('javax.xml.soap.MessageFactory')
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import javax.xml.parsers.DocumentBuilderFactory
+
+class Bad {
+    companion object {
+        val dbFactory: DocumentBuilderFactory = DocumentBuilderFactory.newInstance() // bad
+    }
+    fun parse(xml: String) {
+        val localFactory = DocumentBuilderFactory.newInstance() // ok: local variable
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="SynchronizingForLocalVars"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Local variables don't need synchronization"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#tutc12">
+        <description>Problem: Synchronizing a block that only accesses local variables adds locking overhead without protecting shared state.
+            Solution: Only synchronize when the block accesses shared mutable state. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Note: (: isWithin pattern :) pmd-kotlin:isWithin() does not exist in released PMD 7.28.0, experimental/future API.
+   Replaced below with plain ancestor:: checks; see AvoidExcessiveClassloadingWithSaajSoap (remotingnextgen.xml)
+   for more details. Grep for "(: isWithin pattern :)" to find/simplify all occurrences if isWithin() is ever
+   actually released. :)
+//PostfixUnaryExpression[
+    PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='synchronized']
+    and PostfixUnarySuffix/CallSuffix
+    and ancestor::FunctionBody
+    and not(
+        PostfixUnarySuffix/CallSuffix//LambdaLiteral//PostfixUnaryExpression[
+            PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+                ancestor::ClassBody[1]//PropertyDeclaration[
+                    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+                ]/VariableDeclaration/@Identifier
+        ]
+    )
+    and not(
+        PostfixUnarySuffix/CallSuffix//LambdaLiteral//Assignment[
+            (DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text =
+                ancestor::ClassBody[1]//PropertyDeclaration[
+                    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+                ]/VariableDeclaration/@Identifier
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class SyncService {
+    fun bad(): String {
+        var localVar = "start"
+        synchronized(this) {
+            localVar = "updated" // bad
+        }
+        return localVar
+    }
+}
+        ]]></example>
+    </rule>
+
+<!-- END Included file 'concurrentnextgen.xml' -->
+<!-- BEGIN Included file 'remotingnextgen.xml' -->
+    <rule name="AvoidExcessiveClassloadingWithSaajSoap"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid excessive class loading with SAAJ SOAP messaging, use alternative Axiom, or system properties."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi23">
+        <description>Problem: SAAJ uses DOM to load the XML document in memory, which uses a TransformerFactory. The
+            implementation class of it is loaded on every call that causes lock contention under load. This means long
+            response times.
+            Solution: If possible, use Axiom SOAP messaging which uses the faster StAX. If you have/want to stick to
+            SAAJ, set the proper system properties to prevent the excessive class loading.
+            Note: Axiom (2.0) is available again in Spring web services, since version 4.1.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Constructor call to SaajSoapMessageFactory without TransformerFactory system property fix :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.springframework.ws.soap.saaj.SaajSoapMessageFactory#<init>(*)')
+    and not(ancestor::ClassBody//PostfixUnaryExpression[
+        PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='System']
+        and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='setProperty']
+        and .//T-LineStrText[@Text='javax.xml.transform.TransformerFactory']
+    ])
+]
+,
+(: Class-level property with explicit SaajSoapMessageFactory type (no constructor call, that is caught above).
+   (: isWithin pattern :) pmd-kotlin:isWithin('function-body'/'lambda') does not exist in released PMD (7.28.0) -
+   it is from a proposed/experimental future API. Replaced here with a plain ancestor:: check instead, since
+   PropertyDeclaration is used for class-level properties, local variables and lambda-local variables alike;
+   only the ancestor axis distinguishes a class-level declaration from a local one. If/when isWithin() is
+   actually released, search for "(: isWithin pattern :)" to find and simplify all occurrences of this idiom. :)
+//PropertyDeclaration[
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and pmd-kotlin:typeIs('org.springframework.ws.soap.saaj.SaajSoapMessageFactory')
+    and not(.//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.springframework.ws.soap.saaj.SaajSoapMessageFactory#<init>(*)')])
+    and not(ancestor::ClassBody//PostfixUnaryExpression[
+        PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='System']
+        and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='setProperty']
+        and .//T-LineStrText[@Text='javax.xml.transform.TransformerFactory']
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+    </rule>
+
+<!-- END Included file 'remotingnextgen.xml' -->
 <!-- BEGIN Included file 'common.xml' -->
     <rule name="AvoidDecimalAndChoiceFormatAsField"
           language="kotlin"
