@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: hardcoded Kotlin connection configuration properties</description>
+        <expected-problems>3</expected-problems>
+        <expected-linenumbers>2,3,5</expected-linenumbers>
+        <code><![CDATA[
+class BadConnectionConfig {
+    private val connectionTimeout: Int = 5000 // bad
+    val maxRoutesTotal: Long = 200 // bad
+    companion object {
+        const val REQUEST_TIMEOUT = 30000 // bad
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: Spring injected timeout property</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.beans.factory.annotation.Value
+class GoodInjectedConnectionConfig {
+    @Value("\${app.timeout}")
+    private val connectionTimeout: Int = 0
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: typed Duration property</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import kotlin.time.Duration.Companion.seconds
+class GoodDurationConnectionConfig {
+    private val connectionTimeout: kotlin.time.Duration = 5.seconds
+}
+]]></code>
+    </test-code>
+</test-data>

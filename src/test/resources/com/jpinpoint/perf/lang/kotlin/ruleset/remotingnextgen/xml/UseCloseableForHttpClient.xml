@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: http client builder without use</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.impl.client.HttpClientBuilder
+
+class ClientFactory {
+    fun bad() {
+        val client = HttpClientBuilder.create().build()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: closeable client in use block</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.http.client.methods.HttpGet
+import org.apache.http.impl.client.HttpClientBuilder
+
+class ClientFactory {
+    fun good(request: HttpGet) {
+        HttpClientBuilder.create().build().use { client ->
+            client.execute(request)
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: pass client to Spring request factory</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.http.impl.client.HttpClientBuilder
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+
+class ClientFactory {
+    fun good() {
+        val client = HttpClientBuilder.create().build()
+        HttpComponentsClientHttpRequestFactory(client)
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

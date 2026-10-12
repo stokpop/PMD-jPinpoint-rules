@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: large connection timeout literals and property</description>
+        <expected-problems>3</expected-problems>
+        <expected-linenumbers>5,9,10</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.client.config.RequestConfig
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+
+class BadTimeouts {
+    private val connectTimeout: Int = 5000
+
+    fun buildConfig(): RequestConfig =
+        RequestConfig.custom()
+            .setConnectTimeout(5000)
+            .setConnectionRequestTimeout(3000)
+            .build()
+
+    fun buildFactory(): HttpComponentsClientHttpRequestFactory {
+        val factory = HttpComponentsClientHttpRequestFactory()
+        factory.setConnectTimeout(connectTimeout)
+        return factory
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: reasonable timeout literal</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.http.client.config.RequestConfig
+
+class GoodTimeouts {
+    fun buildConfig(): RequestConfig =
+        RequestConfig.custom()
+            .setConnectTimeout(30)
+            .build()
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
