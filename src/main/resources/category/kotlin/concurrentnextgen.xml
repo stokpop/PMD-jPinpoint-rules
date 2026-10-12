@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="jpinpoint-nextgen-rules" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0">
+    <description>jPinpoint "nextgen" rule set: new Kotlin concurrent rules using PMD 7.28.0 type-resolution XPath
+        functions (pmd-kotlin:typeIs, pmd-kotlin:hasAnnotation, pmd-kotlin:matchesSig). These rules REQUIRE a PMD
+        version that supports those features and therefore are NOT included in the standard
+        jpinpoint-kotlin-rules.xml, to keep that file working on older PMD versions. See the "Nextgen rules" section
+        in the README for details. (jpinpoint-rules)
+    </description>
+
+    <rule name="SynchronizingForLocalVars"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Local variables don't need synchronization"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#tutc12">
+        <description>Problem: Synchronizing a block that only accesses local variables adds locking overhead without protecting shared state.
+            Solution: Only synchronize when the block accesses shared mutable state. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Note: (: isWithin pattern :) pmd-kotlin:isWithin() does not exist in released PMD 7.28.0, experimental/future API.
+   Replaced below with plain ancestor:: checks; see AvoidExcessiveClassloadingWithSaajSoap (remotingnextgen.xml)
+   for more details. Grep for "(: isWithin pattern :)" to find/simplify all occurrences if isWithin() is ever
+   actually released. :)
+//PostfixUnaryExpression[
+    PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='synchronized']
+    and PostfixUnarySuffix/CallSuffix
+    and ancestor::FunctionBody
+    and not(
+        PostfixUnarySuffix/CallSuffix//LambdaLiteral//PostfixUnaryExpression[
+            PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+                ancestor::ClassBody[1]//PropertyDeclaration[
+                    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+                ]/VariableDeclaration/@Identifier
+        ]
+    )
+    and not(
+        PostfixUnarySuffix/CallSuffix//LambdaLiteral//Assignment[
+            (DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text =
+                ancestor::ClassBody[1]//PropertyDeclaration[
+                    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+                ]/VariableDeclaration/@Identifier
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class SyncService {
+    fun bad(): String {
+        var localVar = "start"
+        synchronized(this) {
+            localVar = "updated" // bad
+        }
+        return localVar
+    }
+}
+        ]]></example>
+    </rule>
+
+</ruleset>
