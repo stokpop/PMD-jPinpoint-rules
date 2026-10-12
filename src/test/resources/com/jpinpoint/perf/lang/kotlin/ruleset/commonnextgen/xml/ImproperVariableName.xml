@@ -58,4 +58,20 @@ class GoodNames {
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>good: unnamed underscore in lambda parameters and destructuring</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Foo {
+    fun good(map: Map<String, Int>, pair: Pair<Int, Int>) {
+        map.forEach { (_, count) -> println(count) }
+        map.forEach { _, count -> println(count) }
+        map.entries.map { _ -> 1 }
+        val (_, second) = pair
+        println(second)
+    }
+}
+        ]]></code>
+    </test-code>
+
 </test-data>

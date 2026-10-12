@@ -1385,12 +1385,16 @@ class Point(val x: Int, val y: Int) // bad: prefer data class
                 <value><![CDATA[
 (
 //VariableDeclaration[
+    @Identifier != '_' (: unnamed variable :)
+    and (
     matches(@Identifier, '^(VALUE|VAL|INTEGER|INT|LONG|NUMBER|NUM|[0-9]+|ZERO|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|TWENTY|_)+$', 'i')
     or matches(@Identifier, '^var[0-9]+$')
+    )
 ]
 |
-//FunctionValueParameter/Parameter[matches(SimpleIdentifier/*/@Text, '^(VALUE|VAL|INTEGER|INT|LONG|NUMBER|NUM|[0-9]+|ZERO|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|TWENTY|_)+$', 'i')
-    or matches(SimpleIdentifier/*/@Text, '^var[0-9]+$')
+//FunctionValueParameter/Parameter[SimpleIdentifier/*/@Text != '_' (: unnamed parameter :)
+    and (matches(SimpleIdentifier/*/@Text, '^(VALUE|VAL|INTEGER|INT|LONG|NUMBER|NUM|[0-9]+|ZERO|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|TWENTY|_)+$', 'i')
+    or matches(SimpleIdentifier/*/@Text, '^var[0-9]+$'))
 ]
 )
                 ]]></value>
