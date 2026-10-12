@@ -268,6 +268,24 @@ ignore/drop the concurrent.xml duplicate.**
       `@RequestMapping("request")` should NOT be mistaken for `@Scope("request")`) — tested and
       confirmed this combo correctly rejects that case.
 
+11. **`<rule ref="some-sibling-ruleset.xml">` (used by the generated `-nextgen` overlay files to
+    reference the regular merged ruleset and exclude/override select rules) does not resolve when the
+    referencing ruleset is loaded via a remote URL (e.g. the IntelliJ PMD plugin loading our ruleset
+    straight from its `raw.githubusercontent.com` URL)** — confirmed not an IntelliJ-plugin-specific
+    bug but a `pmd-core` limitation: `RuleSetReferenceId.resolveSibling()` only ever resolves a sibling
+    ref using `java.io.File` against the parent's *local filesystem* directory; it has no concept of
+    resolving relative to a parent URL. When the parent is a URL, sibling resolution silently falls
+    through, and the bare filename then fails to resolve via CWD/classpath/absolute-URL too, surfacing
+    an error in IntelliJ that previously required manually removing the `<rule ref="...">` block.
+    - **Fix applied**: changed `RulesetMerger`'s nextgen-overlay generation to fully **inline** all
+      non-overridden rules from the base ruleset file(s) directly into the `-nextgen` output, instead
+      of using `<rule ref="...">` + `<exclude>`. This makes the generated `-nextgen` ruleset file fully
+      self-contained (no external ruleset references at all), so it works identically whether loaded
+      from a local file, the Maven classpath, or a remote URL. Trade-off: the generated file is larger
+      (duplicates the base ruleset's content), but this is consistent with how the regular (non-nextgen)
+      merged ruleset file already works (it also fully inlines all category files).
+    - Filed as upstream improvement idea #5 below (resolving sibling refs relative to a parent URL).
+
 ## Upstream PMD improvement ideas (tracked, not yet filed)
 
 Ideas worth proposing to the `pmd/pmd` project, discovered while doing this migration. None are
@@ -280,6 +298,7 @@ blockers — each has a reliable workaround in use today — but filing them cou
 | 2 | Ship the `pmd-kotlin:isWithin(scopeName)` function that the `kotlin-type-mapper` source branch was apparently written against (e.g. `isWithin('function-body')`, `isWithin('lambda')`) — or document officially that it's not planned, so rule authors stop assuming it exists. | Would let us drop the `not(ancestor::FunctionBody or ancestor::LambdaLiteral)` workaround (71 occurrences expected across this migration) and simplify every affected rule back to a single function call. Each occurrence is marked with `(: isWithin pattern :)` precisely so they can be grepped and reverted if this ships. | Not filed |
 | 3 | Fix `pmd-kotlin:matchesSig()` spuriously matching an outer ancestor `PostfixUnaryExpression` for multi-line method chains ending in a trailing lambda (see pitfall #9). | Would remove the need for a direct-child scoping condition as a workaround in rules like `AvoidFutureJoinWithoutTimeout`, and eliminate a class of silent over-matching (false positives) for any rule using `matchesSig()` near chained calls with lambda arguments. | Not filed |
 | 4 | Make `pmd-kotlin:hasAnnotation()`/`typeIs()` also work when called directly on an `Annotation` node (not just on the annotated declaration node), so a specific annotation usage can be both type-confirmed and introspected for arguments in one step (see pitfall #10). | Would simplify rules that need to read one specific annotation's arguments (e.g. `@Scope("request")`) — currently requires combining a declaration-level `hasAnnotation()` check with a separate name-based `Annotation` node lookup. | Not filed |
+| 5 | Support resolving a bare-filename `<rule ref="other-ruleset.xml">` relative to the URL the *referencing* ruleset itself was loaded from (not just relative to a local-filesystem sibling directory, which is all `RuleSetReferenceId.resolveSibling()` currently does via `java.io.File`). Today, a ruleset loaded from e.g. a `raw.githubusercontent.com` URL (as the IntelliJ PMD plugin does) cannot `ref` a sibling ruleset by bare filename at all — confirmed by reading `pmd-core`'s `RuleSetReferenceId.resolveSibling()` source, which only ever constructs a `java.io.File` sibling path, never resolves against a parent URL. | Would let us go back to the simpler `<rule ref="jpinpoint-kotlin-rules.xml"><exclude .../></rule>` overlay pattern for `jpinpoint-kotlin-rules-nextgen.xml` (and similarly for Java, if a nextgen overlay is ever added there) instead of fully inlining all base-ruleset rules into the overlay file. Found while fixing a real IntelliJ PMD plugin failure: the plugin loads our ruleset via its raw GitHub URL, and the bare-filename ref could not resolve, forcing users to manually strip it. We worked around it by inlining (see commit regenerating `jpinpoint-kotlin-rules-nextgen.xml`), but filing this upstream could let any PMD-ecosystem tool support the simpler reference-based overlay pattern directly. | Not filed |
 
 ## Useful tooling kept around for fast iteration
 
