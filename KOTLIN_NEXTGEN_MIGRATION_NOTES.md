@@ -67,8 +67,10 @@ AvoidUnguardedMutableInheritedFieldsInSharedObjects, NotProperlySynchronizingOnT
 NotProperlySynchronizingOnFieldWhileUsingGuardedBy, WrongUseOfGuardedBy, AvoidStaticXmlFactories,
 AvoidMutableStaticFields, AvoidParallelFlux, AvoidThreadUnsafeJaxbUsage, AvoidReactorOnEachOperator,
 AvoidMDCInReactor, AvoidNonAtomicIfModifyOnConcurrentMap, AvoidIncrementOrDecrementForVolatileField,
-SetQueueCapacityForTaskExecutor, AvoidUserDataInSharedObjects, AvoidVolatileInPrototypeScope,
+AvoidUserDataInSharedObjects, AvoidVolatileInPrototypeScope,
 AvoidMutableCollectionInParallelStreamForEach
+(NB: `SetQueueCapacityForTaskExecutor` also appears under concurrent.xml in the source branch, but is
+a stale duplicate — resolved below, only the remoting.xml version is migrated)
 
 Remaining remoting.xml rules: AvoidXMLGregorianCalendar, AvoidObjectMapperAsField,
 ObjectMapperCreatedForEachMethodCall, GsonCreatedForEachMethodCall,
@@ -81,11 +83,16 @@ AvoidDeprecatedHttpConnectors, DefaultFeignClientWithoutTLSConnectionReuse,
 AvoidHardcodedConnectionConfig, HttpClientImproperConnectionTimeouts, UseCloseableForHttpClient,
 AvoidUnclearHttpRouteSecurity, AvoidDiscardingHttpClientConfig, HttpClientBuilderPoolSettingsIgnored,
 AxualProducerCreatedForEachMethodCall, AvoidClientHttpRequestFactorySupplier,
-HttpInterceptorNotReleasingOnException, SetQueueCapacityForTaskExecutor (NB: also appears under
-concurrent.xml in the source branch — looks like a duplicate/misplaced rule name, verify before porting)
+HttpInterceptorNotReleasingOnException, SetQueueCapacityForTaskExecutor (the canonical, type-aware
+version — see resolution below)
 
 Note: `SetQueueCapacityForTaskExecutor` appears in both concurrent.xml and remoting.xml in
-`kotlin-type-mapper` — check which (or both) is intentional before migrating.
+`kotlin-type-mapper`. **Resolved:** the concurrent.xml copy is a stale pre-type-aware draft (bare
+`T-Identifier[@Text='ThreadPoolTaskExecutor']` string matching, no `matchesSig`); the remoting.xml copy
+is the real type-aware rewrite (`pmd-kotlin:matchesSig('...ThreadPoolTaskExecutor#<init>(*)')`). The
+Java equivalent rule also lives only in `category/java/remoting.xml`, confirming remoting is the
+canonical category. **Decision: migrate only the remoting.xml version into `remotingnextgen.xml`;
+ignore/drop the concurrent.xml duplicate.**
 
 ## Per-rule migration procedure (established, repeat for each)
 
