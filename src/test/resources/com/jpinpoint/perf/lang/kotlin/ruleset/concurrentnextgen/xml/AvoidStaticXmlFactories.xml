@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: DocumentBuilderFactory in companion object</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.parsers.DocumentBuilderFactory
+
+class Bad {
+    companion object {
+        val dbFactory: DocumentBuilderFactory = DocumentBuilderFactory.newInstance() // bad: not thread-safe
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: TransformerFactory in object declaration</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.transform.TransformerFactory
+
+object XmlUtils {
+    val tf: TransformerFactory = TransformerFactory.newInstance() // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: XMLInputFactory as top-level property</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.stream.XMLInputFactory
+
+val xmlInputFactory: XMLInputFactory = XMLInputFactory.newInstance() // bad
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: DocumentBuilderFactory as local variable in function</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.parsers.DocumentBuilderFactory
+
+class Good {
+    fun parse(xml: String) {
+        val dbFactory = DocumentBuilderFactory.newInstance() // ok: local, thread-safe
+        val db = dbFactory.newDocumentBuilder()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: DocumentBuilderFactory in single-expression top-level function</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.parsers.DocumentBuilderFactory
+
+fun parseXml(xml: String) =
+    DocumentBuilderFactory.newInstance().newDocumentBuilder() // ok: local usage
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: SAXParserFactory created in lambda</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.parsers.SAXParserFactory
+
+fun parseAll(xmlList: List<String>) =
+    xmlList.map {
+        SAXParserFactory.newInstance().newSAXParser() // ok: local per invocation
+    }
+        ]]></code>
+    </test-code>
+
+</test-data>

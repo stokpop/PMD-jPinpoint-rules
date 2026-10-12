@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: companion object var counter</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class CounterStore {
+    companion object {
+        var counter = 0
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: companion object mutable list var</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class Cache {
+    companion object {
+        var instances: MutableList<String> = mutableListOf()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: volatile companion var</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodVolatile {
+    companion object {
+        @Volatile
+        var counter = 0
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: immutable companion val</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Constants {
+    companion object {
+        val CONSTANT = "fixed"
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: atomic val in companion object</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.concurrent.atomic.AtomicInteger
+
+class AtomicCounter {
+    companion object {
+        val counter = AtomicInteger(0)
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

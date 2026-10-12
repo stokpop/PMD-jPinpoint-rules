@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: volatile field increment</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+class Counter {
+    @Volatile
+    private var counter = 0
+
+    fun bad() {
+        counter++
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: volatile field decrement</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+class Counter {
+    @Volatile
+    private var counter = 0
+
+    fun bad() {
+        counter--
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: volatile field plus assignment</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+class Counter {
+    @Volatile
+    private var count = 0
+
+    fun bad() {
+        count += 1
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: atomic integer increment</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.concurrent.atomic.AtomicInteger
+
+class Counter {
+    private val atomicCounter = AtomicInteger()
+
+    fun good() {
+        atomicCounter.incrementAndGet()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: simple volatile assignment</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class FlagHolder {
+    @Volatile
+    private var flag = false
+
+    fun good() {
+        flag = true
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

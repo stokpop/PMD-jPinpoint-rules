@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>violation: non-private fields in @Controller shared object</description>
+        <expected-problems>3</expected-problems>
+        <expected-linenumbers>7,8,9</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.stereotype.Controller
+
+@Controller
+class RootController {
+
+    var baskets: List<Any> = listOf()              // bad, not private
+    protected var baskets2: List<Any> = listOf()   // bad, not private
+    internal var baskets3: List<Any> = listOf()    // bad, not private
+    val baskets4: List<Any> = listOf()             // good, val (final)
+    private var baskets5: List<Any> = listOf()     // good, private
+    private val baskets6: List<Any> = listOf()     // good, private val
+
+    @Autowired
+    lateinit var baskets7: List<Any>               // allowed, injected
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: not a shared object</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class RootController {
+    var baskets: List<Any> = listOf() // good, not a shared object
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: shared object but @NotThreadSafe</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import net.jcip.annotations.NotThreadSafe
+import org.springframework.stereotype.Controller
+
+@Controller
+@NotThreadSafe
+class RootController {
+    var baskets: List<Any> = listOf() // allowed, specified NotThreadSafe
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: fields in nested classes inside shared object</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Controller
+
+@Controller
+class RootController {
+    class Sub {
+        var baskets: List<Any> = listOf() // allowed, nested class not known singleton
+    }
+    inner class Sub2 {
+        var baskets: List<Any> = listOf() // allowed, inner class not known singleton
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: injected fields with @Autowired/@Value/@Inject</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.inject.Inject
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.stereotype.Component
+
+@Component
+abstract class Issue268 {
+
+    @Autowired
+    protected lateinit var quickSupport: Any
+
+    @Value("\${config.url}")
+    lateinit var configUrl: String
+
+    @Inject
+    lateinit var injectedService: Any
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Scope("request") excludes shared-object check</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Service
+
+@Service
+@Scope("request")
+class RequestScopedService {
+    var data: String = "" // allowed, request scoped
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: @Service with non-private var fields</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>6,7</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.stereotype.Service
+
+@Service
+class MyService {
+
+    var mutableField: String = ""          // bad, not private
+    lateinit var otherField: String        // bad, not private, not injected
+    private var privateField: String = ""  // good, private
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: companion object non-private var field</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.stereotype.Repository
+
+@Repository
+class MyRepo {
+    companion object {
+        val CONSTANT: String = "ok"            // good, val
+        var counter: Int = 0                   // bad, not private
+        private var internalCounter: Int = 0   // good, private
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: @RestController non-private fields</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.web.bind.annotation.RestController
+
+@RestController
+class MyRestController {
+
+    var cache: Map<String, Any> = mapOf() // bad, not private
+    private var internalCache: Map<String, Any> = mapOf() // good, private
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: @Scope("prototype") excludes shared-object check</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Component
+
+@Component
+@Scope("prototype")
+class PrototypeBean {
+    var data: String = "" // allowed, prototype scoped
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: @Scope with non-request value and unrelated annotation with "request" string — false negative with text-based @Scope check</description>
+        <expected-problems>1</expected-problems>
+        <code><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Service
+import org.springframework.web.bind.annotation.RequestMapping
+
+@Service
+@Scope("production")
+@RequestMapping("request")
+class ProductionScopedService {
+    var notPrivate: String = "" // bad: non-private field in shared singleton
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

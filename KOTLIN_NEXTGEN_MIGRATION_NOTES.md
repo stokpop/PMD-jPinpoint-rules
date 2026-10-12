@@ -17,7 +17,7 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 
 ## Status (as of this note)
 
-7 of ~103 candidate rule changes migrated and committed, all tests green:
+12 of ~103 candidate rule changes migrated and committed, all tests green:
 
 | # | Rule | Nextgen file | Commit |
 |---|------|--------------|--------|
@@ -28,6 +28,11 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 | 5 | AvoidCommonPoolForBlockingCalls | concurrentnextgen.xml | 4cef4ea5 |
 | 6 | AvoidExecutorInvokeWithoutTimeout | concurrentnextgen.xml | 4cef4ea5 |
 | 7 | AvoidParallelStreamWithCommonPool | concurrentnextgen.xml | 4cef4ea5 |
+| 8 | AvoidFutureJoinWithoutTimeout | concurrentnextgen.xml | (this commit) |
+| 9 | AvoidNonPrivateFieldsInSharedObjects | concurrentnextgen.xml | (this commit) |
+| 10 | AvoidMutableStaticFields | concurrentnextgen.xml | (this commit) |
+| 11 | AvoidStaticXmlFactories | concurrentnextgen.xml | (this commit) |
+| 12 | AvoidIncrementOrDecrementForVolatileField | concurrentnextgen.xml | (this commit) |
 
 ## Full remaining scope
 
@@ -184,6 +189,85 @@ ignore/drop the concurrent.xml duplicate.**
    assume everything from this branch is broken; only `isWithin()` is confirmed fictional/future, and
    the `@Identifier`/keyword-tokenization issues are AST-attribute mistakes, not missing functions.
 
+6. **`X[@Attr]='value'` vs `X[@Attr='value']` are NOT equivalent — a real authoring bug, not a PMD
+   bug.** `X[@Attr]='value'` filters `X` nodes to those having `@Attr` (any value), then compares the
+   resulting NODE-SET's string-value (i.e. the element's own text content) to `'value'`. For PMD's
+   Kotlin AST, token/leaf nodes like `T-Identifier` are self-closing (`<T-Identifier Text='counter' />`)
+   with no text content, so their string-value is always empty — the comparison silently never matches.
+   The correct form is `X[@Attr='value']` (compares the attribute's value) or `X/@Attr='value'`. Found
+   while porting `AvoidIncrementOrDecrementForVolatileField` (6/6 expected violations dropped to 0).
+   Always double check whether an unexpected 0-match is a real PMD quirk (there are some — see e.g.
+   PMD PR #7168, a genuine line-based type-attribute leak bug in `pmd-kotlin`) vs. our own XPath
+   mistake; this one was ours.
+
+7. **Rules using `hasAnnotation()`/`typeIs()`/`matchesSig()` against *non-JDK* library types need the
+   real library jar on `--aux-classpath` to test correctly — otherwise they silently produce ZERO
+   violations even though the XPath is correct.** PMD itself warns about this at the CLI level:
+   `[WARN] No auxClasspath configured for Kotlin; type resolution will not work.` Don't mistake a
+   missing-classpath false-negative for an XPath bug when iterating locally — e.g.
+   `AvoidNonPrivateFieldsInSharedObjects` (checks `org.springframework.stereotype.Controller` etc.)
+   needed `--aux-classpath <path-to-spring-context.jar>` to produce any violations at all; rules
+   against `java.util.concurrent.*`/`javax.xml.*` types work without extra classpath since those are
+   JDK built-ins always resolvable.
+   PMD exposes this gap to rule authors too, via a real, confirmed-working function:
+   **`pmd-kotlin:hasUnresolvedReference()`**, usable on `ImportHeader` nodes — this is exactly what
+   the (not yet migrated) `UnresolvedType` common.xml rule uses
+   (`//ImportHeader[pmd-kotlin:hasUnresolvedReference()]`) to self-diagnose a misconfigured classpath
+   for consumers of the ruleset. Confirmed via test: flags the import when aux-classpath is missing,
+   clears once the correct jar is supplied. Worth migrating early since it's cheap and helps catch
+   exactly this class of silent false-negative for every other type-aware rule in the ruleset.
+
+8. **`pmd-kotlin:modifiers()` returns a SEQUENCE of modifier strings, not a single scalar value** — a
+   property/declaration can have multiple modifiers simultaneously (e.g. `private lateinit var x`
+   yields both `'private'` and `'lateinit'`; confirmed via `count(pmd-kotlin:modifiers()) > 1`).
+   `not(pmd-kotlin:modifiers()='private')` therefore works correctly via XPath's general-comparison
+   semantics (sequence `=` string is existential — true if ANY item matches), but should be read/
+   described as "modifiers() contains 'private'", not "modifiers() equals 'private'" — the `=` is
+   doing containment, not scalar equality. No bug here, just a naming/mental-model clarification worth
+   keeping in mind so nobody "fixes" it into a broken single-value comparison later.
+
+9. **`pmd-kotlin:matchesSig()` can spuriously match an OUTER ancestor `PostfixUnaryExpression` for
+   multi-line method chains that end in a trailing lambda** — a suspected genuine `pmd-kotlin`
+   bug, not an XPath authoring mistake. Found in `AvoidFutureJoinWithoutTimeout`: for
+   `return futures.filter{...}.map{it.join()}` spanning several lines, `matchesSig('...Future#join()')`
+   returned `true` not only for the innermost `it.join()` node (correct) but ALSO for the entire outer
+   `PostfixUnaryExpression` wrapping the whole `return`-statement chain, even though `.join()` is nested
+   three levels deep inside an unrelated lambda body, not a direct suffix of that outer node at all.
+   This produced 4 matches instead of the expected 2 (two real + two phantom ancestor matches). This
+   looks like the same class of line/position-based type-attribution bug as PMD PR #7168 and
+   `stokpop/kotlin-type-mapper#36` ("fix: property declaration position and inferred lambda
+   parameters") — type/call info leaking onto a neighbouring or enclosing node for multi-line
+   constructs with lambdas.
+   - **Fix/mitigation**: add a direct-child (not descendant, not `[last()]`) scoping condition
+     confirming the node's own immediate suffix really is the call in question, e.g.
+     `PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = 'join'`. This restricts the match
+     back down to the exact node whose own suffix is `.join()`, excluding phantom ancestor matches.
+   - **This refines pitfall #4 above** (scrutinize "extra" conditions alongside `matchesSig()` as
+     likely redundant): in this case the extra condition is NOT redundant — it is load-bearing and
+     necessary to work around this over-matching bug. Going forward: test rules both WITH and WITHOUT
+     the companion condition to empirically determine necessity, rather than assuming redundancy.
+   - Not yet audited: whether this affects any other already-migrated rule using `matchesSig()` near
+     chained calls with trailing lambdas — worth a dedicated audit pass later.
+
+10. **`pmd-kotlin:hasAnnotation()` / `typeIs()` only resolve correctly when called on the *annotated
+    declaration* node itself (e.g. `ClassDeclaration`, `FunctionDeclaration`), NOT on the `Annotation`
+    node that represents one specific annotation usage.** Calling `hasAnnotation(...)` or `typeIs(...)`
+    directly on an `Annotation` node always returns `false`/no-match, confirmed via isolated test
+    (`//Annotation[pmd-kotlin:hasAnnotation(...)]` → 0 matches; `//ClassDeclaration[pmd-kotlin:hasAnnotation(...)]`
+    → matches correctly on the same input). This matters whenever a rule needs to read an *argument*
+    of one specific annotation (not just test for its presence) — e.g. `AvoidNonPrivateFieldsInSharedObjects`
+    needed to read the string argument of `@Scope("request")`/`@Scope("prototype")` to exclude
+    non-singleton-scoped classes.
+    - **Fix**: use `hasAnnotation()` at the declaration level to confirm a real, resolvable annotation
+      of the right fully-qualified type is present, and separately select the specific `Annotation`
+      node by its literal simple name (e.g. `.//Annotation[.//SimpleIdentifier/*/@Text='Scope']`) to
+      read its arguments. Combining both avoids two failure modes: (a) missing exclusion entirely
+      (if you only did the name-based match with no type check, an unrelated `@Scope` from a
+      different package would wrongly match too), and (b) false exclusion from an unrelated
+      annotation's argument text coincidentally containing the same string (e.g.
+      `@RequestMapping("request")` should NOT be mistaken for `@Scope("request")`) — tested and
+      confirmed this combo correctly rejects that case.
+
 ## Upstream PMD improvement ideas (tracked, not yet filed)
 
 Ideas worth proposing to the `pmd/pmd` project, discovered while doing this migration. None are
@@ -194,6 +278,8 @@ blockers — each has a reliable workaround in use today — but filing them cou
 |---|------|------------------|--------|
 | 1 | Extend `@Identifier` (or an equivalent convenience attribute) to expression/reference nodes (`PrimaryExpression`, `NavigationSuffix`, `SimpleIdentifier`) wherever they resolve to a plain identifier/call name, not just declaration nodes. | Would let XPath rules match identifier/method-call text uniformly, without needing to know about Kotlin soft-keyword token types (`T-GET`, `T-SET`, etc.) or fall back to `*`-wildcard children. Removes a whole class of silent-zero-match bugs (pitfalls #2 and #3 above) across all our Kotlin rules, present and future. | Not filed |
 | 2 | Ship the `pmd-kotlin:isWithin(scopeName)` function that the `kotlin-type-mapper` source branch was apparently written against (e.g. `isWithin('function-body')`, `isWithin('lambda')`) — or document officially that it's not planned, so rule authors stop assuming it exists. | Would let us drop the `not(ancestor::FunctionBody or ancestor::LambdaLiteral)` workaround (71 occurrences expected across this migration) and simplify every affected rule back to a single function call. Each occurrence is marked with `(: isWithin pattern :)` precisely so they can be grepped and reverted if this ships. | Not filed |
+| 3 | Fix `pmd-kotlin:matchesSig()` spuriously matching an outer ancestor `PostfixUnaryExpression` for multi-line method chains ending in a trailing lambda (see pitfall #9). | Would remove the need for a direct-child scoping condition as a workaround in rules like `AvoidFutureJoinWithoutTimeout`, and eliminate a class of silent over-matching (false positives) for any rule using `matchesSig()` near chained calls with lambda arguments. | Not filed |
+| 4 | Make `pmd-kotlin:hasAnnotation()`/`typeIs()` also work when called directly on an `Annotation` node (not just on the annotated declaration node), so a specific annotation usage can be both type-confirmed and introspected for arguments in one step (see pitfall #10). | Would simplify rules that need to read one specific annotation's arguments (e.g. `@Scope("request")`) — currently requires combining a declaration-level `hasAnnotation()` check with a separate name-based `Annotation` node lookup. | Not filed |
 
 ## Useful tooling kept around for fast iteration
 
