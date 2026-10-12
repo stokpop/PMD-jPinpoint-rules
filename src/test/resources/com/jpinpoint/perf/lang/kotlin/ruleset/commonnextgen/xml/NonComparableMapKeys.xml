@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: map declaration with non comparable key type</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import java.util.HashMap
+
+class BadMapKey {
+    val map: Map<MyNonComparableClass, String> = HashMap()
+}
+
+class MyNonComparableClass
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: hash map declaration with non comparable key type</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import java.util.HashMap
+
+class BadHashMapKey {
+    val myMap: HashMap<BadKey, Int> = HashMap()
+}
+
+class BadKey
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: string map key is comparable</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.HashMap
+
+class GoodStringMap {
+    val map: Map<String, Int> = HashMap()
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: tree map with comparator</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.Comparator
+import java.util.TreeMap
+
+class GoodTreeMap {
+    val comparator = Comparator<MyClass> { left, right -> left.id.compareTo(right.id) }
+    val map: TreeMap<MyClass, Int> = TreeMap(comparator)
+}
+
+class MyClass(val id: String)
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: immutable map factory</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodMapOf {
+    val map: Map<String, Int> = mapOf()
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

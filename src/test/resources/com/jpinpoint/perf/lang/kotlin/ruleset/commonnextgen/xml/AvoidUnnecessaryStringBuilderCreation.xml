@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: chained string builder append toString</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class Greeter {
+    fun bad(name: String): String {
+        return StringBuilder().append("hello").append(name).toString()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: constructor arg string builder chain</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class Greeter {
+    fun bad(user: Any): String {
+        return StringBuilder("Hello ").append(user).toString()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: string template</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Greeter {
+    fun good(name: String): String {
+        return "hello$name"
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: separate statements</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Greeter {
+    fun good(): String {
+        val sb = StringBuilder()
+        sb.append("x")
+        return sb.toString()
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: equals uses name but hashCode only uses id</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class BadHashFields(id: String, name: String) {
+    private val id = id
+    private val name = name // bad
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is BadHashFields) return false
+        return id == other.id && name == other.name
+    }
+
+    override fun hashCode(): Int {
+        return id.hashCode()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: data class auto-generates matching equals and hashCode</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+data class GoodHashFields(val id: String, val name: String)
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: all fields used in equals are also used in hashCode</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodHashFieldsExplicit(id: String, name: String) {
+    private val id = id
+    private val name = name
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is GoodHashFieldsExplicit) return false
+        return id == other.id && name == other.name
+    }
+
+    override fun hashCode(): Int {
+        return 31 * id.hashCode() + name.hashCode()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: class without equals and hashCode overrides</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class PlainHashFields(id: String, name: String) {
+    private val id = id
+    private val name = name
+}
+        ]]></code>
+    </test-code>
+</test-data>

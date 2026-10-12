@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>bad: EqualsBuilder reflectionEquals in equals</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.commons.lang3.builder.EqualsBuilder
+
+class BadEquals(private val id: String) {
+    override fun equals(other: Any?): Boolean {
+        return EqualsBuilder.reflectionEquals(this, other)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: HashCodeBuilder reflectionHashCode in hashCode</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.commons.lang3.builder.HashCodeBuilder
+
+class BadHash(private val id: String) {
+    override fun hashCode(): Int {
+        return HashCodeBuilder.reflectionHashCode(this)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: manual field comparison</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodManual(private val id: String) {
+    override fun equals(other: Any?): Boolean {
+        return other is GoodManual && id == other.id
+    }
+
+    override fun hashCode(): Int {
+        return id.hashCode()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: EqualsBuilder append without reflection</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.commons.lang3.builder.EqualsBuilder
+
+class GoodAppend(private val field1: String) {
+    fun sameAs(other: GoodAppend): Boolean {
+        return EqualsBuilder().append(field1, other.field1).isEquals
+    }
+}
+        ]]></code>
+    </test-code>
+</test-data>

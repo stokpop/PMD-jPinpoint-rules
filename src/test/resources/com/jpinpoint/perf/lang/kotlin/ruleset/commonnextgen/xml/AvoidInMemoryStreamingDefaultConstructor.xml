@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>AvoidInMemoryStreamingDefaultConstructor - default constructor</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>6,7</expected-linenumbers>
+        <code><![CDATA[
+import java.io.ByteArrayOutputStream
+import java.io.StringWriter
+
+class AvoidInMemoryStreamingDefaultConstructor {
+    fun bad() {
+        var baos = ByteArrayOutputStream() //bad
+        val sw = StringWriter() //bad
+    }
+    fun good() {
+        val baos = ByteArrayOutputStream(8192) // 8 kiB
+        val sw = StringWriter(2048)
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>AvoidInMemoryStreamingDefaultConstructor - capacity not larger than default </description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>6,7</expected-linenumbers>
+        <code><![CDATA[
+import java.io.ByteArrayOutputStream
+import java.io.StringWriter
+
+class AvoidInMemoryStreamingDefaultConstructor {
+    fun bad() {
+        val baos = ByteArrayOutputStream(32) //bad - not larger than default
+        val sw = StringWriter(16) //bad - not larger than default
+    }
+    fun good() {
+        val baos = ByteArrayOutputStream(8192) // 8 kiB
+        val sw = StringWriter(2048)
+        val sw2 = StringWriter(17)
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>FQN usage without import should be flagged</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>3,4</expected-linenumbers>
+        <code><![CDATA[
+class AvoidInMemoryStreamingFqn {
+    fun bad() {
+        val baos = java.io.ByteArrayOutputStream() //bad - FQN no import
+        val sw = java.io.StringWriter() //bad - FQN no import
+    }
+    fun good() {
+        val baos = java.io.ByteArrayOutputStream(8192)
+        val sw = java.io.StringWriter(2048)
+    }
+}
+]]></code>
+    </test-code>
+
+    <test-code>
+        <description>Fix Request: false positive in AvoidInMemoryStreamingDefaultConstructor for Kotlin #616</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.io.ByteArrayOutputStream
+import java.io.StringWriter
+
+class Issue616 {
+
+    fun withPiWriter(onlyForMuzzlPMD: Int, proc: Consumer<PiWriter>): String {
+        StringWriter(onlyForMuzzlPMD).use { stringWriter ->
+            PiWriter(stringWriter).use { piWriter ->
+                proc.accept(piWriter)
+                piWriter.flush()
+                return stringWriter.toString()
+            }
+        }
+    }
+    fun toGzip(decompressed: ByteArray) =
+        runCatching {
+            ByteArrayOutputStream(decompressed.size).use { baos ->
+                GZIPOutputStream(baos).use { gzos ->
+                    gzos.write(decompressed)
+                    gzos.finish()
+                    baos.toByteArray()
+                }
+            }
+        }
+
+     fun readBodyBytes(dbf: List<DataBuffer>): ByteArray {
+        return ByteArrayOutputStream(BUFFER_SIZE_BYTES).use { boas ->
+            dbf.forEach { db ->
+                val b = db.asInputStream().readBytes()
+                boas.writeBytes(b)
+            }
+            boas.toByteArray()
+        }
+     }
+}
+
+]]></code>
+    </test-code>
+
+</test-data>

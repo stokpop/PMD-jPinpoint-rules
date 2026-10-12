@@ -17,7 +17,7 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 
 ## Status (as of this note)
 
-57 of ~103 candidate rule changes migrated and committed, all tests green:
+All rules from kotlin-type-mapper are migrated (98 rules in the nextgen files; the 5 base remoting rules are deliberately skipped, see below). All tests green:
 
 | # | Rule | Nextgen file | Commit |
 |---|------|--------------|--------|
@@ -73,11 +73,11 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 | 50 | HttpClientBuilderPoolSettingsIgnored | remotingnextgen.xml | aa26e8b1 |
 | 51 | AxualProducerCreatedForEachMethodCall | remotingnextgen.xml | aa26e8b1 |
 | 52 | AvoidClientHttpRequestFactorySupplier | remotingnextgen.xml | aa26e8b1 |
-| 53 | HttpInterceptorNotReleasingOnException | remotingnextgen.xml | (this commit) |
-| 54 | SetQueueCapacityForTaskExecutor | remotingnextgen.xml | (this commit) |
-| 55 | AvoidCalendar | commonnextgen.xml | (this commit) |
-| 56 | AvoidCalendarDateCreation | commonnextgen.xml | (this commit) |
-| 57 | AvoidLoadingAllFromFile | commonnextgen.xml | (this commit) |
+| 53 | HttpInterceptorNotReleasingOnException | remotingnextgen.xml | e74bfc80 |
+| 54 | SetQueueCapacityForTaskExecutor | remotingnextgen.xml | e74bfc80 |
+| 55 | AvoidCalendar | commonnextgen.xml | e74bfc80 |
+| 56 | AvoidCalendarDateCreation | commonnextgen.xml | e74bfc80 |
+| 57 | AvoidLoadingAllFromFile | commonnextgen.xml | e74bfc80 |
 
 ## Full remaining scope
 
@@ -394,6 +394,10 @@ blockers — each has a reliable workaround in use today — but filing them cou
 | 3 | Fix `pmd-kotlin:matchesSig()` spuriously matching an outer ancestor `PostfixUnaryExpression` for multi-line method chains ending in a trailing lambda (see pitfall #9). | Would remove the need for a direct-child scoping condition as a workaround in rules like `AvoidFutureJoinWithoutTimeout`, and eliminate a class of silent over-matching (false positives) for any rule using `matchesSig()` near chained calls with lambda arguments. | Not filed |
 | 4 | Make `pmd-kotlin:hasAnnotation()`/`typeIs()` also work when called directly on an `Annotation` node (not just on the annotated declaration node), so a specific annotation usage can be both type-confirmed and introspected for arguments in one step (see pitfall #10). | Would simplify rules that need to read one specific annotation's arguments (e.g. `@Scope("request")`) — currently requires combining a declaration-level `hasAnnotation()` check with a separate name-based `Annotation` node lookup. | Not filed |
 | 5 | Support resolving a bare-filename `<rule ref="other-ruleset.xml">` relative to the URL the *referencing* ruleset itself was loaded from (not just relative to a local-filesystem sibling directory, which is all `RuleSetReferenceId.resolveSibling()` currently does via `java.io.File`). Today, a ruleset loaded from e.g. a `raw.githubusercontent.com` URL (as the IntelliJ PMD plugin does) cannot `ref` a sibling ruleset by bare filename at all — confirmed by reading `pmd-core`'s `RuleSetReferenceId.resolveSibling()` source, which only ever constructs a `java.io.File` sibling path, never resolves against a parent URL. | Would let us go back to the simpler `<rule ref="jpinpoint-kotlin-rules.xml"><exclude .../></rule>` overlay pattern for `jpinpoint-kotlin-rules-nextgen.xml` (and similarly for Java, if a nextgen overlay is ever added there) instead of fully inlining all base-ruleset rules into the overlay file. Found while fixing a real IntelliJ PMD plugin failure: the plugin loads our ruleset via its raw GitHub URL, and the bare-filename ref could not resolve, forcing users to manually strip it. We worked around it by inlining (see commit regenerating `jpinpoint-kotlin-rules-nextgen.xml`), but filing this upstream could let any PMD-ecosystem tool support the simpler reference-based overlay pattern directly. | Not filed |
+| 6 | Add `@Identifier` (or a general `@Name`) to `Parameter`, `SimpleUserType` (type names like `Map`, `HashMap`) and `DirectlyAssignableExpression` (assignment targets). Today only `SimpleIdentifier/*/@Text` works there, while `VariableDeclaration`, `FunctionDeclaration`, `ClassDeclaration` and `ClassParameter` do have `@Identifier`. | Needed by about 15 of the last 41 rules (AvoidTimeUnitConfusion, NonComparableMapKeys, OptimizeMapOrSetForEnum, AvoidDuplicateAssignmentsInCases, ...). The workaround is verbose and inconsistent. | Not filed |
+| 7 | Expose modifiers as attributes on `ClassDeclaration`/`FunctionDeclaration`/`PropertyDeclaration` (e.g. `@Modifiers`, or flags like `@Data`, `@Enum`). The source branch assumed `@Modifiers` exists. | Replaces the `Modifiers//T-ENUM` and `Modifiers//T-DATA` lookups (ImplementEqualsHashCodeOnValueObjects, OptimizeMapOrSetForEnum). | Not filed |
+| 8 | Ship scope helpers `pmd-kotlin:isWithin('companion-object'/'object-declaration'/'top-level'/'function-body'/'lambda')` and `pmd-kotlin:hasVariableArgument()` (is a call argument a parameter/variable rather than a literal). The source branch used both. | Both are expressible with the ancestor axis and a parameter-name comparison (see AvoidRecreatingDateTimeFormatter), but that XPath is long and easy to get wrong. | Not filed |
+| 9 | Make a missing aux-classpath jar visible: `matchesSig()`/`typeIs()` silently return false when the type is unresolved (e.g. threetenbp). An optional diagnostic or warning would help. Also `ast-dump` has no `--aux-classpath` option, so `AnnotationFqNames` is always empty there. | Missing jars looked like rule bugs (0 violations). | Not filed |
 
 ## Useful tooling kept around for fast iteration
 
@@ -414,4 +418,26 @@ blockers — each has a reliable workaround in use today — but filing them cou
 Verified via git history: the 11 modified base common.xml rules were last changed in base before kotlin-type-mapper
 branched (2025 - Jan 2026), and the branch contains the relevant fixes (issues 651/653/670), so its versions are
 supersets. Base-only post-branch fixes affect only AvoidMultipleConcatStatements (already in commonnextgen.xml).
-Still run each modified rule's tests under PMD 7.28.0 before keeping an overlay. 33 new common rules remain, 11 modified.
+
+### Final bulk batch: remaining 41 common.xml rules (all in commonnextgen.xml)
+AvoidInMemoryStreamingDefaultConstructor, AvoidStringBuffer, AvoidDecimalAndChoiceFormatAsField, AvoidRecompilingPatterns,
+MDCPutWithoutRemove, AvoidRecompilingXPathExpression, AvoidSimpleDateFormat, AvoidWideScopeXPathExpression,
+AvoidRecreatingDateTimeFormatter, AvoidXPathAPIUsage, AvoidImplicitlyRecompilingRegex, LegacyTimeLibraryUsed,
+UnresolvedType, BufferFileStreaming, BufferFilesNewStream, InitializeComparatorOnlyOnce, AvoidReStreamingEnumValues,
+AvoidRecreatingSecurityProviders, AvoidReflectionInToStringAndHashCode, UnconditionalConcatInLogArgument,
+AvoidXPathUsage, AvoidTimeUnitConfusion, UnconditionalOperationOnLogArgument, AvoidUnconditionalBuiltLogStrings,
+UnconditionalCreatedLogArguments, AvoidUnnecessaryStringBuilderCreation, AvoidMutableLists, ImproperVariableName,
+UsingSuppressWarnings, UsingSuppressWarningsHighRisk, OptimizeMapOrSetForEnum, NonComparableMapKeys,
+NonComparableSetElements, AvoidDuplicateAssignmentsInCases, ImplementEqualsHashCodeOnValueObjects,
+EqualsOperationInconsistentWithHashCode, FieldOfHashCodeMissingInEquals, MissingFieldInEquals, MissingFieldInHashCode,
+HashCodeOnlyCallsSuper, AvoidInfiniteRecursion.
+
+Extra pitfalls found in this batch (all fixed with plain XPath):
+- `@Identifier` does NOT exist on Parameter, SimpleUserType, NavigationSuffix, PrimaryExpression,
+  DirectlyAssignableExpression; use `SimpleIdentifier/*/@Text`. It DOES exist on VariableDeclaration,
+  FunctionDeclaration, ClassDeclaration and ClassParameter.
+- ClassDeclaration has no `@Modifiers`; use `Modifiers//T-ENUM` / `Modifiers//T-DATA`.
+- `hasAnnotation` does not work on an Annotation node (UsingSuppressWarnings*): match the annotation type name.
+- The nonexistent `isWithin('companion-object'|'top-level'|'object-declaration')` and `hasVariableArgument()`
+  (AvoidRecreatingDateTimeFormatter) were replaced by ancestor axes and a parameter-name comparison.
+- Added test dep org.threeten:threetenbp 1.7.1 so matchesSig resolves the threeten DateTimeFormatter.

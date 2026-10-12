@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>bad: hashCode uses name but equals does not</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class BadEqualsConsistency(id: String, name: String) {
+    private val id = id
+    private val name = name // bad
+
+    override fun equals(other: Any?): Boolean {
+        return other is BadEqualsConsistency && id == other.id
+    }
+
+    override fun hashCode(): Int {
+        return 31 * id.hashCode() + name.hashCode()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: equals and hashCode use same fields</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodEqualsConsistency(id: String, name: String) {
+    private val id = id
+    private val name = name
+
+    override fun equals(other: Any?): Boolean {
+        return other is GoodEqualsConsistency && id == other.id && name == other.name
+    }
+
+    override fun hashCode(): Int {
+        return 31 * id.hashCode() + name.hashCode()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: data class uses generated equals and hashCode</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+data class GoodDataFields(val id: String, val name: String)
+        ]]></code>
+    </test-code>
+</test-data>

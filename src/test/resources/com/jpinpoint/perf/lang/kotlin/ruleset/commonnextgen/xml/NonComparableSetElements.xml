@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: hash set with non comparable element used with contains</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.util.HashSet
+
+class BadSetElement {
+    fun bad(elem: BadElement): Boolean {
+        val mySet: HashSet<BadElement> = HashSet()
+        mySet.add(elem)
+        return mySet.contains(elem)
+    }
+}
+
+class BadElement
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: string set is comparable</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.HashSet
+
+class GoodStringSet {
+    fun good(elem: String): Boolean {
+        val mySet: Set<String> = HashSet()
+        return mySet.contains(elem)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: tree set with comparator</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.Comparator
+import java.util.TreeSet
+
+class GoodTreeSet {
+    fun good(elem: MyClass): Boolean {
+        val comparator = Comparator<MyClass> { left, right -> left.id.compareTo(right.id) }
+        val mySet: TreeSet<MyClass> = TreeSet(comparator)
+        return mySet.contains(elem)
+    }
+}
+
+class MyClass(val id: String)
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: immutable set factory</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodSetOf {
+    fun good(elem: String): Boolean {
+        val mySet: Set<String> = setOf()
+        return mySet.contains(elem)
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

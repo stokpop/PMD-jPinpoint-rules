@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: Files.newInputStream without buffering</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import java.nio.file.Files
+import java.nio.file.Paths
+
+fun read(name: String) = Files.newInputStream(Paths.get(name)).use { it.readAllBytes() }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: Files.newOutputStream without buffering</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun write(path: Path, data: ByteArray) = Files.newOutputStream(path).use { it.write(data) }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: Files.newInputStream in lambda per element</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun readAll(paths: List<Path>) = paths.map {
+    Files.newInputStream(it).use { s -> s.readAllBytes() } // bad: unbuffered per element
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: Files.newInputStream wrapped in BufferedInputStream</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.io.BufferedInputStream
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun read(path: Path) = BufferedInputStream(Files.newInputStream(path)).use { it.readAllBytes() }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: Files.newBufferedReader (already buffered)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun read(path: Path) = Files.newBufferedReader(path).use { it.readText() }
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: Files.newOutputStream wrapped in BufferedOutputStream</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.io.BufferedOutputStream
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun write(path: Path, data: ByteArray) = BufferedOutputStream(Files.newOutputStream(path)).use { it.write(data) }
+        ]]></code>
+    </test-code>
+
+</test-data>

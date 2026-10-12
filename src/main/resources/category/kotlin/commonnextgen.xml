@@ -157,4 +157,1857 @@ fun good(path: Path) = Files.newInputStream(path).use { it.copyTo(System.out) } 
         ]]></example>
     </rule>
 
+    <rule name="AvoidInMemoryStreamingDefaultConstructor"
+          language="kotlin"
+          message="The default capacity or smaller is used for ByteArrayOutputStream or StringWriter, it usually needs expensive expansions."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+externalInfoUrl="${doc_root}/JavaCodePerformance.md#isio01">
+        <description>
+            The default constructor of ByteArrayOutputStream creates a 32-byte initial capacity and for StringWriter 16 chars. Problem: Such a small buffer as capacity usually needs several expensive expansions.&#13;
+            Solution: Pre-size the ByteArrayOutputStream or StringWriter with an initial capacity such that an expansion is not needed in most cases, typically much larger than 32, for instance, 4096.
+            (jpinpoint-rules)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.io.ByteArrayOutputStream#<init>()')
+    or (pmd-kotlin:matchesSig('java.io.ByteArrayOutputStream#<init>(*)')
+        and .//ValueArguments/ValueArgument//T-IntegerLiteral[number(@Text) <= 32])
+    or pmd-kotlin:matchesSig('java.io.StringWriter#<init>()')
+    or (pmd-kotlin:matchesSig('java.io.StringWriter#<init>(*)')
+        and .//ValueArguments/ValueArgument//T-IntegerLiteral[number(@Text) <= 16])
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.io.ByteArrayOutputStream
+import java.io.StringWriter
+
+class AvoidInMemoryStreamingDefaultConstructor {
+    fun bad() {
+        var baos = ByteArrayOutputStream() //bad
+        val sw = StringWriter() //bad
+        baos = ByteArrayOutputStream(32) //bad - not larger than default
+    }
+    fun good() {
+        val baos = ByteArrayOutputStream(8192) // 8 kiB
+        val sw = StringWriter(2048)
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidStringBuffer" class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="StringBuffer is used. It introduces locking overhead, use StringBuilder."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isu01" >
+        <description>Problem: StringBuffer introduces locking overhead because it is thread safe. Its thread-safety is rarely needed.&#13;
+            Solution: Replace StringBuffer by StringBuilder.  (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: requires type info on the declaration or initializer expression :)
+//PropertyDeclaration[
+    pmd-kotlin:typeIs('java.lang.StringBuffer')
+    or Expression//PrimaryExpression[pmd-kotlin:typeIs('java.lang.StringBuffer')]
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+class AvoidStringBuffer {
+    var fieldSb: StringBuffer? = null // bad
+    fun bad() {
+        val sb = StringBuffer() // bad
+    }
+    fun good() {
+        val sb = StringBuilder()
+    }
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidDecimalAndChoiceFormatAsField"
+          language="kotlin"
+          message="Avoid using NumberFormat, DecimalFormat or ChoiceFormat as field since it is thread-unsafe."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isio01">
+        <description>
+            Problem: java.text.DecimalFormat and java.text.ChoiceFormat are thread-unsafe.
+            Solution: usual solution is to create a new local one when needed in a method.
+            (jpinpoint-rules)
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: requires type info on the declaration or initializer expression :)
+(: also match when declared type is a supertype (e.g. val x: NumberFormat = DecimalFormat(...)) :)
+//PropertyDeclaration[
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and (
+        pmd-kotlin:typeIs('java.text.DecimalFormat') or pmd-kotlin:typeIs('java.text.ChoiceFormat')
+        or Expression//PrimaryExpression[
+            pmd-kotlin:typeIs('java.text.DecimalFormat') or pmd-kotlin:typeIs('java.text.ChoiceFormat')
+        ]
+    )
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Foo {
+
+    companion object {
+        val NUMBER_FORMAT: DecimalFormat = DecimalFormat("###.###") // bad
+    }
+
+    private val numFormat: NumberFormat = DecimalFormat("###.###") //bad
+
+    private val limits = doubleArrayOf(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0)
+    private val dayOfWeekNames = arrayOf("Sun", "Mon", "Tue", "Wed", "Thur", "Fri", "Sat")
+    private val form = ChoiceFormat(limits, dayOfWeekNames) // bad
+
+    fun shouldNotMatchInsideMethod() {
+        val format: NumberFormat = DecimalFormat("##.##")
+        val choiceFormat = ChoiceFormat(limits, dayOfWeekNames)
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidRecompilingPatterns"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Pattern.compile is used in a method. Compiling a regex pattern can be expensive, make it a constant or instance field."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ireu02">
+        <description>A regular expression is compiled on every invocation. Problem: this can be expensive, depending on the length of the regular expression.&#13;
+            Solution: Usually a pattern is a literal, not dynamic and can be compiled only once. Assign it to a private constant or instance field.
+            java.util.Pattern objects are thread-safe so they can be shared among threads. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: requires kotlin-type-mapper auxClasspath; matchesSig replaces import filter :)
+(: deduplication: only match innermost PUE — avoids column-range false positives on outer chain PUEs :)
+//PostfixUnaryExpression[
+    (ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and pmd-kotlin:matchesSig('java.util.regex.Pattern#compile(*)')
+    and not(.//PostfixUnaryExpression[pmd-kotlin:matchesSig('java.util.regex.Pattern#compile(*)')])
+(: check for variables $action or ${action} in String of compile() call (first in possible call chain): allow dynamic input :)
+    and not(
+        let $params := ancestor::FunctionDeclaration//FunctionValueParameter/Parameter/SimpleIdentifier/*/@Text
+        return
+            ((.//ValueArgument)[1]//PostfixUnaryExpression//T-Identifier | (.//ValueArgument)[1]//T-LineStrRef)[
+                @Text = $params
+                or (some $x in $params satisfies @Text = concat('$', $x))
+            ]
+    )
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.util.regex.Pattern
+
+internal object Bad {
+    const val STR_PAT1: String = "[A-Z][a-z]+"
+
+    fun bad() {
+        val p1: Pattern = Pattern.compile(STR_PAT1) // bad
+        val p2: Pattern = Pattern.compile("(?=\\p{Lu})") // bad
+        val b: Boolean = p1.matcher("Start ").matches()
+    }
+}
+
+internal object Good {
+    val PAT1: Pattern = Pattern.compile("[A-Z][a-z]+")
+    val PAT2: Pattern = Pattern.compile("(?=\\p{Lu})")
+
+    fun good() {
+        val b: Boolean = PAT1.matcher("Start ").matches()
+    }
+}
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="MDCPutWithoutRemove"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="MDC put is used without remove or clear in the same function"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#IL04">
+        <description>
+            MDC values are added for logging, but no corresponding remove or clear is performed. Problem: MDC values can leak to other user transactions (requests) and log incorrect information. Solution: remove the MDC value in a finally clause or clear the MDC.
+            (jpinpoint-rules - Kotlin)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Select calls to MDC.put(..) - pmd-kotlin:matchesSig identifies org.slf4j.MDC precisely :)
+(: Report at PostfixUnaryExpression (MDC start) for correct line numbers on multi-line calls :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.slf4j.MDC#put(*)')
+    and not(
+        (: same function body has direct MDC.remove/clear :)
+        ancestor::FunctionBody//PostfixUnaryExpression[
+            PrimaryExpression[SimpleIdentifier/*/@Text='MDC']
+            and PostfixUnarySuffix/NavigationSuffix[SimpleIdentifier/*/@Text=('remove','clear')]
+        ]
+        or
+        (
+          (: put-arg text equals any remove-arg text inside a helper method that is called from a finally block in this class :)
+          ancestor::ClassDeclaration
+            //FunctionDeclaration[
+              @Identifier = ancestor::ClassDeclaration//TryExpression//FinallySection//PostfixUnaryExpression[PostfixUnarySuffix/CallSuffix]//PrimaryExpression/SimpleIdentifier/*/@Text
+            ]
+            //PostfixUnaryExpression[
+              PrimaryExpression[SimpleIdentifier/*/@Text='MDC']
+              and PostfixUnarySuffix/NavigationSuffix[SimpleIdentifier/*/@Text='remove']
+            ]/PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument[1]//(SimpleIdentifier/T-Identifier|LineStringLiteral//T-LineStrText)/@Text
+          =
+          .//PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument[1]//(SimpleIdentifier/T-Identifier|LineStringLiteral//T-LineStrText)/@Text
+        )
+        or
+        (
+          (: helper method called from finally does MDC.clear() :)
+          ancestor::ClassDeclaration
+            //FunctionDeclaration[
+              @Identifier = ancestor::ClassDeclaration//TryExpression//FinallySection//PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text
+            ]
+            //PostfixUnaryExpression[
+              PrimaryExpression[SimpleIdentifier/*/@Text='MDC']
+              and PostfixUnarySuffix/NavigationSuffix[SimpleIdentifier/*/@Text='clear']
+            ]
+        )
+        or
+        (
+          (: looser, anywhere in class: a remove of same key exists :)
+          ancestor::ClassDeclaration//PostfixUnaryExpression[
+             PrimaryExpression[SimpleIdentifier/*/@Text='MDC']
+             and PostfixUnarySuffix/NavigationSuffix[SimpleIdentifier/*/@Text='remove']
+          ]/PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument[1]//(SimpleIdentifier/T-Identifier|LineStringLiteral//T-LineStrText)/@Text
+          =
+          .//PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument[1]//(SimpleIdentifier/T-Identifier|LineStringLiteral//T-LineStrText)/@Text
+        )
+        or
+        (
+          (: looser, anywhere in class: a clear exists :)
+          ancestor::ClassDeclaration//PostfixUnaryExpression[
+             PrimaryExpression[SimpleIdentifier/*/@Text='MDC']
+             and PostfixUnarySuffix/NavigationSuffix[SimpleIdentifier/*/@Text='clear']
+          ]
+        )
+    )
+]
+]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.slf4j.MDC
+
+class BadKotlinMdc {
+    fun bad() {
+        MDC.put("levelKey1", "levelName1") // bad, not removed or cleared
+        MDC.put("levelKey2", "levelName2") // bad, not removed or cleared
+    }
+}
+
+class GoodKotlinMdc {
+    fun good() {
+        try {
+            MDC.put("levelKey1", "levelName1")
+            MDC.put("levelKey2", "levelName2")
+        } finally {
+            MDC.clear()
+        }
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidRecompilingXPathExpression" class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="XPathExpression is created and compiled every time. Beware it is thread-unsafe."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ux02">
+        <description>XPathExpression is created and compiled on every method call, compiled possibly implicitly by XPath::evaluate.
+            Problem: Creation of XPath and compilation of XPathExpression takes time. It may slow down your application. &#13;
+            Solution:
+            1. Avoid XPath usage.
+            2. Compile the xpath expression as String into a XPathExpression. However, since XPath and XPathExpression classes are thread-unsafe, they are not easily cached. Caching it in a ThreadLocal may be a solution.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: requires kotlin-type-mapper auxClasspath; matchesSig replaces import filter :)
+(: match FunctionBody or LambdaLiteral that contains a newXPath() call :)
+//(FunctionBody|LambdaLiteral)[.//PostfixUnaryExpression[pmd-kotlin:matchesSig('javax.xml.xpath.XPathFactory#newXPath()')]]
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('javax.xml.xpath.XPath#compile(*)')
+     or pmd-kotlin:matchesSig('javax.xml.xpath.XPath#evaluate(_,_,_)')
+    )
+    (: deduplication: only match innermost PUE — avoids column-range false positives :)
+    and not(.//PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('javax.xml.xpath.XPath#compile(*)')
+        or pmd-kotlin:matchesSig('javax.xml.xpath.XPath#evaluate(_,_,_)')
+    ])
+]
+(: note on limitation: the 2-argument evaluate variant is not detected :)
+]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.w3c.dom.Document
+import org.w3c.dom.NodeList
+import javax.xml.xpath.*
+
+class AvoidRecompilingXPathExpressionKotlin {
+    fun bad1(doc: Document?): NodeList {
+        val xpath: XPath = XPathFactory.newInstance().newXPath()
+        val expr: XPathExpression = xpath.compile("//book[author='Isaac Asimov']/title/text()") // bad
+        return expr.evaluate(doc, XPathConstants.NODESET) as NodeList
+    }
+
+    @Throws(XPathExpressionException::class)
+    fun bad2(doc: Document?): NodeList {
+        val xpath: XPath = XPathFactory.newInstance().newXPath()
+        val xPathQuery = "//book[author='Isaac Asimov']/title/text()"
+        return xpath.evaluate(xPathQuery, doc, XPathConstants.NODESET) as NodeList // bad
+    }
+}
+
+object GoodAvoidRecompilingXPathExpressionKt {
+    private val tlFac = ThreadLocal.withInitial { XPathFactory.newInstance() }
+    private val tlExpr: ThreadLocal<XPathExpression>
+
+    init {
+        val xpath = tlFac.get().newXPath()
+        val expr: XPathExpression = try {
+            xpath.compile("//book[author='Isaac Asimov']/title/text()")
+        } catch (e: XPathExpressionException) {
+            throw RuntimeException(e)
+        }
+        tlExpr = ThreadLocal.withInitial { expr } // good
+    }
+
+    @Throws(XPathExpressionException::class)
+    fun good(doc: Document?): NodeList {
+        return tlExpr!!.get().evaluate(doc, XPathConstants.NODESET) as NodeList // good
+    }
+}
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidSimpleDateFormat"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="SimpleDateFormat is used. Since it is thread-unsafe, it needs expensive recreation."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#idtf01">
+        <description>Problem: java.util.SimpleDateFormat is thread-unsafe. The usual solution is to create a new one when needed in a method. Creating SimpleDateFormat is relatively expensive. &#13;
+            Solution: Use java.time.DateTimeFormatter. These classes are immutable, thus thread-safe and can be made static.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.text.SimpleDateFormat#<init>(*)')
+    and not(
+        ancestor::PostfixUnaryExpression[
+            pmd-kotlin:matchesSig('com.fasterxml.jackson.databind.ObjectMapper#setDateFormat(*)')
+        ]
+        or ancestor::ClassMemberDeclaration[
+            .//PostfixUnaryExpression[
+                pmd-kotlin:matchesSig('com.fasterxml.jackson.databind.ObjectMapper#setDateFormat(*)')
+            ]
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.text.SimpleDateFormat
+import java.util.*
+
+class Foo {
+    private fun toKey(calcDate: Date): String {
+        val formatter = SimpleDateFormat("yyyy-MM-dd") //bad
+        return formatter.format(calcDate)
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidWideScopeXPathExpression"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="XPathExpression targets a wide scope, this is potentially slow."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ux01">
+        <description>The XPathExpression targets a wide scope since it starts with `//`. Problem: XPath has to search in a wide scope for occurrences, this may take a while. &#13;
+            Solution:
+            1. Avoid XPath usage.
+            2. Make the scope as narrow as possible, do not start with `//`.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: matchesSig for javax.xml.xpath.XPath#compile; report at the T-Identifier token (line of .compile) not the full expression start :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('javax.xml.xpath.XPath#compile(_)')
+    and (.//ValueArgument)[1]//T-LineStrText[starts-with(@Text, '//')]
+]
+/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='compile']]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.w3c.dom.Node
+import javax.xml.xpath.XPath
+import javax.xml.xpath.XPathFactory
+
+class Foo {
+
+    var xpath: XPath = XPathFactory.newInstance().newXPath()
+
+    fun parseSomething(books: Node) {
+        val expr = xpath
+            .compile("//book[author='Isaac Asimov']/title/text()") // bad
+        val result = expr.evaluate(books)
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidRecreatingDateTimeFormatter"
+          message="Avoid recreating DateTimeFormatter, it is relatively expensive."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule" language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/master/docs/JavaCodePerformance.md#idtf02">
+        <description>
+            Problem: Recreating a DateTimeFormatter is relatively expensive.&#13;
+            Solution: org.joda.time.format.DateTimeFormatter or Java 8 java.time.DateTimeFormatter is thread-safe and can be shared among threads. Create the
+            formatter from a pattern only once, to initialize a constant or instance field.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.joda.time.format.DateTimeFormat#_(*)')
+    or pmd-kotlin:matchesSig('org.joda.time.format.DateTimeFormatterBuilder#_(*)')
+    or pmd-kotlin:matchesSig('org.joda.time.format.ISODateTimeFormat#_(*)')
+    or pmd-kotlin:matchesSig('org.joda.time.format.DateTimeFormatter#<init>(*)')
+    or pmd-kotlin:matchesSig('java.time.format.DateTimeFormatter#ofPattern(*)')
+    or pmd-kotlin:matchesSig('java.time.format.DateTimeFormatterBuilder#_(*)')
+    or pmd-kotlin:matchesSig('org.threeten.bp.format.DateTimeFormatter#ofPattern(*)')
+    or pmd-kotlin:matchesSig('org.threeten.bp.format.DateTimeFormatterBuilder#_(*)')
+][
+    (: val in companion object = effectively static final :)
+    not(ancestor::CompanionObject and ancestor::PropertyDeclaration[@Mutable = false()])
+    (: top-level val = effectively static final :)
+    and not(not(ancestor::ClassDeclaration or ancestor::ObjectDeclaration) and ancestor::PropertyDeclaration[@Mutable = false()])
+    (: val in object declaration (Kotlin singleton), not inside a function or lambda :)
+    and not(ancestor::ObjectDeclaration
+            and not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+            and ancestor::PropertyDeclaration[@Mutable = false()])
+    (: variable argument, i.e. a function or constructor parameter used in the call :)
+    and not(
+        (ancestor::PropertyDeclaration[@Mutable = false()]
+         or ancestor::FunctionBody or ancestor::LambdaLiteral)
+        and not(pmd-kotlin:matchesSig('org.joda.time.format.DateTimeFormatter#<init>(*)'))
+        and .//ValueArgument//SimpleIdentifier/*/@Text = (
+            ancestor::FunctionDeclaration[1]//Parameter/SimpleIdentifier/*/@Text,
+            ancestor::ClassDeclaration[1]//ClassParameter/@Identifier)
+    )
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+class Bad {
+    public String formatDate(LocalDateTime date)  {
+        DateTimeFormatter dtf =  new DateTimeFormatterBuilder().toFormatter(); // bad, created each time
+        return dtf.format(date);
+    }
+}
+
+class Good {
+    private static final DateTimeFormatter DTF = new DateTimeFormatterBuilder().toFormatter();
+
+    public String formatDate(LocalDateTime date)  {
+        return DTF.format(date); // good, reuse thread-safe formatter
+    }
+}
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidXPathAPIUsage"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="XPathAPI is used. XPathAPI implementation has bad performance."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ux01">
+        <description>XPathAPI is used. Problem: XPathAPI implementation is slow.&#13;
+            Solution:
+            1. try to avoid using XPathAPI.
+            2. improve performance by using jvm parameters and possibly CachedXPathAPI.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
+            <!--property name="tag" value="performance" type="String" description="for-sonar"/-->
+            <property name="xpath">
+                <value><![CDATA[
+(: XPathAPI is highly specific; @Identifier replaces import filter + SimpleIdentifier/T-Identifier traversal :)
+//PrimaryExpression[SimpleIdentifier/*/@Text='XPathAPI']
+	]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.w3c.dom.Node
+import org.apache.xpath.XPathAPI
+import org.apache.xpath.CachedXPathAPI
+
+class FooBad {
+    fun getAction(doc: Node?): String? {
+        return try {
+            XPathAPI.eval(doc, "/Envelope/Header/Action").toString() // bad
+        } catch (e: TransformerException) {
+            null
+        }
+    }
+}
+
+class FooGood {
+    fun getAction(doc: Node?): String? {
+        return try {
+            CachedXPathAPI.eval(doc, "/Envelope/Header/Action").toString()
+        } catch (e: TransformerException) {
+            null
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidImplicitlyRecompilingRegex"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="String regex method, Pattern.matches or FileSystem.getPathMatcher is used. Implicitly compiles a regex pattern, can be expensive."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ireu01">
+        <description>A regular expression is compiled implicitly on every invocation. Problem: this can be expensive, depending on the length of the regular expression.&#13;
+            Solution: Compile the regex pattern only once and assign it to a private static final Pattern field. java.util.Pattern objects are thread-safe so they can be shared among threads.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tag" value="jpinpoint-rule" type="String" description="for-sonar"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Branch 1: Regex constructor — uses @Identifier on PrimaryExpression; matchesSig has column-range bug on multi-line PUEs :)
+//PostfixUnaryExpression[
+    (ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and PrimaryExpression[SimpleIdentifier/*/@Text='Regex']
+    (: not called on fun parameter :)
+    and not(.//CallSuffix//PrimaryExpression//T-Identifier[
+        @Text = ancestor::FunctionDeclaration//FunctionValueParameter//Parameter/SimpleIdentifier/*/@Text])
+    (: not called on 'dynamic' function call — from outer PUE: chain-call + Regex-call + inner-call = 3 levels :)
+    and not(ancestor::PostfixUnaryExpression/PostfixUnarySuffix/CallSuffix//CallSuffix//CallSuffix)
+    (: not if based on local variable initialized by fun parameter :)
+    and not(ancestor::CallSuffix//PostfixUnaryExpression/PrimaryExpression[SimpleIdentifier/*/@Text =
+        ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration/@Identifier])
+    (: not param in String template in fun parameter :)
+    and not(.//CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef[
+       @Text = ancestor::FunctionDeclaration//Parameter/SimpleIdentifier/T-Identifier/concat('$', @Text)])
+    (: not param in String template of class var field :)
+    and not(.//CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef[
+       @Text = ancestor::ClassDeclaration//PropertyDeclaration[@Mutable = true()]//SimpleIdentifier/T-Identifier/concat('$', @Text)])
+    (: not param in String concatenation of class var field :)
+    and not(.//CallSuffix/ValueArguments/ValueArgument[//LineStringLiteral]//AdditiveExpression/MultiplicativeExpression//SimpleIdentifier/T-Identifier[
+       @Text = ancestor::ClassDeclaration//PropertyDeclaration[@Mutable = true()]//VariableDeclaration/@Identifier])
+]
+
+|
+
+(: Branch 2: .toRegex() — using @Identifier; matchesSig FQCN for kotlin.text.StringsKt#toRegex needs verification :)
+//PostfixUnaryExpression[
+    (ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and PostfixUnarySuffix/NavigationSuffix[SimpleIdentifier/*/@Text='toRegex']
+    (: not called on function parameter :)
+    and not(PrimaryExpression[SimpleIdentifier/*/@Text = ancestor::FunctionDeclaration//FunctionValueParameter//Parameter/SimpleIdentifier/*/@Text])
+    (: not called on 'dynamic' function call :)
+    and not(PostfixUnarySuffix[1]/CallSuffix)
+    (: not if based on local variable initialized by fun parameter :)
+    and not(PrimaryExpression[SimpleIdentifier/*/@Text = ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration/@Identifier])
+]
+
+|
+
+(: Branch 3: Pattern.matches — uses @Identifier; import filter replaced by distinctive class name :)
+//PostfixUnaryExpression[PrimaryExpression[SimpleIdentifier/*/@Text='Pattern']
+    and PostfixUnarySuffix/NavigationSuffix[SimpleIdentifier/*/@Text='matches']
+    (: not if first param is fun parameter :)
+    and not(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument[1]//SimpleIdentifier/T-Identifier[
+        @Text = ancestor::FunctionDeclaration//Parameter/SimpleIdentifier/*/@Text])
+]
+
+|
+
+(: Branch 4: FileSystem.getPathMatcher — navigate to T-Identifier leaf to report correct line for multi-line chains :)
+//PostfixUnaryExpression[
+    (ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and (PrimaryExpression[SimpleIdentifier/*/@Text='FileSystems']
+     or PrimaryExpression[SimpleIdentifier/*/@Text =
+          ancestor::FunctionBody//PropertyDeclaration/VariableDeclaration[..//Expression//PrimaryExpression[SimpleIdentifier/*/@Text='FileSystems']]/@Identifier]
+    )
+]/PostfixUnarySuffix/NavigationSuffix[SimpleIdentifier/*/@Text='getPathMatcher'
+    (: not if first param is fun parameter :)
+    and not(../following-sibling::PostfixUnarySuffix[1]/CallSuffix/ValueArguments/ValueArgument[1]//SimpleIdentifier/T-Identifier[
+        @Text = ancestor::FunctionDeclaration//Parameter/SimpleIdentifier/*/@Text])
+    (: not param in String template in fun parameter :)
+    and not(../following-sibling::PostfixUnarySuffix[1]/CallSuffix/ValueArguments/ValueArgument[1]//LineStringContent/T-LineStrRef[
+        @Text = ancestor::FunctionDeclaration//Parameter/SimpleIdentifier/T-Identifier/concat('$', @Text)])
+]/SimpleIdentifier/T-Identifier[@Text='getPathMatcher']
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+class Foo {
+
+    companion object {
+        val INNER_LINE_BREAK_REGEX = """([^.\n])\n""".toRegex()
+        val INNER_LINE_BREAK_PATTERN = """([^.\n])\n""".toPattern()
+    }
+
+    fun bad_replaceInnerLineBreakBySpace(text: String): String {
+        return text.replace("""([^.\n])\n""".toRegex(), "$1 ") // bad
+    }
+
+    fun good_replaceInnerLineBreakBySpace1(text: String): String {
+        return text.replace(INNER_LINE_BREAK_REGEX, "$1 ") // good
+    }
+
+    fun good_replaceInnerLineBreakBySpace2(text: String): String {
+        return INNER_LINE_BREAK_PATTERN.matcher(text).replaceAll("$1 ") // good
+    }
+
+    fun storeUsingRegex(regex: String, sourceName: String, dataTable: DataTable) {
+        val dtm = dataTable.asMaps()
+        val source = testContext.parameter(sourceName)
+        val matches = Regex(regex).findAll(source.toString()).toList()
+    }
+}
+        </example>
+    </rule>
+
+    <rule name="LegacyTimeLibraryUsed"
+          language="kotlin"
+          message="Migrate from the legacy time library to java.time for better performance."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#uoslc03">
+        <description>Problem: The JodaTime and ThreeTenBp libraries have non-optimal performance and memory usage.
+            Solution: Migrate to java.time for a modern solution with better performance and less memory usage.
+            If stuck on Java 6 or 7, ThreeTenBp is the best option; then suppress the violation.
+            (jpinpoint-rules)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,memory,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//ImportHeader[.//T-Identifier[@Text='joda'] and .//T-Identifier[@Text='time']][1]
+|
+//ImportHeader[.//T-Identifier[@Text='threeten'] and .//T-Identifier[@Text='bp']][1]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.joda.time.DateTime // bad
+import org.threeten.bp.format.DateTimeFormatter // bad
+import java.time.LocalDateTime // good
+        ]]></example>
+    </rule>
+
+    <rule name="UnresolvedType"
+          language="kotlin"
+          message="A type cannot be resolved. Make sure all dependencies are available on the classpath."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodeQuality.md#M04">
+        <description>Problem: When analyzing Kotlin code, a type reference could not be resolved. This typically means a dependency is missing from the analysis classpath. Several rules (using typeIs, matchesSig) depend on type information; without it they may produce false positives or miss violations.
+            Solution: Make sure all dependencies are available on the auxiliary classpath (--aux-classpath). Compile all source code before running PMD. Note: this rule requires kotlin-type-mapper for type resolution.
+        </description>
+        <priority>5</priority>
+        <properties>
+            <property name="tags" value="confusing,jpinpoint-rule" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//ImportHeader[pmd-kotlin:hasUnresolvedReference()]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import com.missing.dependency.SomeClass // bad - 'SomeClass' dependency not on classpath
+
+import java.util.List // good - java.util is always available
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="BufferFileStreaming"
+          message="FileInputStream or FileOutputStream used without buffering. Wrap with BufferedInputStream or BufferedOutputStream."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isio05">
+        <description>Problem: With FileInputStream and FileOutputStream, file access is not buffered.
+            The stream is read-from/written-to file byte by byte, where each operating system call has its overhead, which makes it slow.
+            Solution: Use buffering to read/write a chunk of bytes at once with much lower overhead.
+            Use BufferedOutput/InputStream which has a buffer size of 8 kB by default to write at once. Make sure to close it after use.
+            (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="cpu,io,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('java.io.FileInputStream#<init>(*)')
+    or pmd-kotlin:matchesSig('java.io.FileOutputStream#<init>(*)'))
+    and not(ancestor::PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('java.io.BufferedInputStream#<init>(*)')
+        or pmd-kotlin:matchesSig('java.io.BufferedOutputStream#<init>(*)')
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.io.BufferedInputStream
+import java.io.FileInputStream
+
+fun bad(name: String): ByteArray =
+    FileInputStream(name).use { it.readBytes() } // bad
+
+fun good(name: String): ByteArray =
+    BufferedInputStream(FileInputStream(name)).use { it.readBytes() } // ok
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="BufferFilesNewStream"
+          message="Files.newInputStream or newOutputStream is not buffered."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isio06">
+        <description>Problem: Files.newInputStream or Files.newOutputStream is not buffered.
+            The stream is read from/written to file byte by byte, where each OS call has overhead making it slow.
+            Solution: Wrap with BufferedInputStream / BufferedOutputStream, or use Files.newBufferedReader/newBufferedWriter.
+            (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="cpu,io,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('java.nio.file.Files#newInputStream(*)')
+     or pmd-kotlin:matchesSig('java.nio.file.Files#newOutputStream(*)'))
+    and not(ancestor::PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('java.io.BufferedInputStream#<init>(*)')
+        or pmd-kotlin:matchesSig('java.io.BufferedOutputStream#<init>(*)')
+        or pmd-kotlin:matchesSig('java.io.BufferedReader#<init>(*)')
+        or pmd-kotlin:matchesSig('java.io.BufferedWriter#<init>(*)')
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.io.BufferedInputStream
+import java.nio.file.Files
+import java.nio.file.Path
+
+fun bad(path: Path) = Files.newInputStream(path).use { it.readAllBytes() } // bad
+fun good(path: Path) = BufferedInputStream(Files.newInputStream(path)).use { it.readAllBytes() } // ok
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="InitializeComparatorOnlyOnce"
+          message="A Comparator is initialized inside a method or lambda; initialize it once as a shared field."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ue03">
+        <description>Problem: Creating Comparator instances repeatedly in functions is inefficient.
+            Solution: Initialize the Comparator once as a companion object val or top-level val and reuse.
+            For idiomatic Kotlin, prefer compareBy/compareByDescending at top-level or companion object.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,performance,sustainability-medium,cpu" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('java.util.Comparator#comparing(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#comparingInt(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#comparingDouble(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#comparingLong(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#nullsFirst(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#nullsLast(*)')
+     or pmd-kotlin:matchesSig('java.util.Comparator#reversed()'))
+    and (ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and not(ancestor::PropertyDelegate)
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.util.Comparator
+data class Person(val name: String)
+class PersonSorter {
+    fun sortBad(people: List<Person>) = people.sortedWith(Comparator.comparing { it.name }) // bad: recreated per call
+    companion object {
+        val BY_NAME = Comparator.comparing(Person::name) // ok: created once
+    }
+    fun sortGood(people: List<Person>) = people.sortedWith(BY_NAME)
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidReStreamingEnumValues"
+          message="Avoid repeated streaming of enum values(); use a cached lookup map or values().firstOrNull."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iuoc07">
+        <description>Problem: The time to find an enum value by field is O(n). Streaming enum values() repeatedly is inefficient.
+            Solution: Use a companion object map for O(1) lookup, or use the idiomatic Kotlin values().firstOrNull { }.
+            (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('java.util.stream.Stream#findFirst()')
+     or pmd-kotlin:matchesSig('java.util.stream.Stream#findAny()'))
+    and (pmd-kotlin:matchesSig('java.util.stream.Stream#of(*)')
+         or pmd-kotlin:matchesSig('java.util.Arrays#stream(*)'))
+    and .//PostfixUnaryExpression[pmd-kotlin:matchesSig('_#values()')]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.util.stream.Stream
+enum class Status(val code: String) { ACTIVE("A"), INACTIVE("I"), PENDING("P"), DELETED("D") }
+fun bad(code: String) = Stream.of(*Status.values()).filter { it.code == code }.findFirst().orElse(null) // bad
+fun good(code: String) = Status.values().firstOrNull { it.code == code } // ok: idiomatic Kotlin
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidRecreatingSecurityProviders"
+          message="Avoid re-creating security providers in methods; register them once (e.g. in a companion object init block)."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ue04">
+        <description>Problem: Creating security providers (e.g. BouncyCastleProvider) is expensive and should be done once.
+            Re-creating them in methods or lambdas wastes CPU and may cause duplicate registration warnings.
+            Solution: Register the provider once in a companion object init block or a top-level property.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.bouncycastle.jce.provider.BouncyCastleProvider#<init>(*)')
+    and (ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and not(ancestor::PropertyDelegate)
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.security.Security
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+fun bad(data: ByteArray): ByteArray {
+    Security.addProvider(BouncyCastleProvider()) // bad: expensive per call
+    return data
+}
+class Good {
+    companion object { init { Security.addProvider(BouncyCastleProvider()) } } // ok: once
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidReflectionInToStringAndHashCode"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid reflection-based equals and hashCode helpers."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ipb06">
+        <description>Problem: reflection-based EqualsBuilder and HashCodeBuilder variants are slower than explicit field comparisons.
+            Solution: compare relevant fields directly, or use Kotlin data classes where appropriate. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.apache.commons.lang3.builder.EqualsBuilder#reflectionEquals(*)')
+    or pmd-kotlin:matchesSig('org.apache.commons.lang3.builder.HashCodeBuilder#reflectionHashCode(*)')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.commons.lang3.builder.EqualsBuilder
+
+class Bad(private val id: String) {
+    override fun equals(other: Any?): Boolean {
+        return EqualsBuilder.reflectionEquals(this, other) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="UnconditionalConcatInLogArgument"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="String concatenation (+) is executed regardless of log level and can be expensive"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#il01">
+        <description>Problem: String concatenation and string interpolation are executed regardless of log level and can be expensive.
+            Solution: Use SLF4J formatting with {} placeholders or guard the log statement conditionally. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = ('trace', 'debug', 'info')
+    and PostfixUnarySuffix/CallSuffix
+    and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) = 1
+    and (
+        pmd-kotlin:matchesSig('org.slf4j.Logger#trace(*)')
+        or pmd-kotlin:matchesSig('org.slf4j.Logger#debug(*)')
+        or pmd-kotlin:matchesSig('org.slf4j.Logger#info(*)')
+        or PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = 'log'
+    )
+    and (
+        PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//LineStringContent/T-LineStrRef
+        or PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//AdditiveExpression
+    )
+    and not(
+        ancestor::IfExpression[
+            .//PostfixUnaryExpression[
+                PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = ('isTraceEnabled', 'isDebugEnabled', 'isInfoEnabled')
+            ]
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad(userId: String) {
+        log.debug("Getting user $userId") // bad
+    }
+
+    fun good(userId: String) {
+        log.debug("Getting user {}", userId) // good
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidXPathUsage"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="XPathFactory.newInstance is used. XPathFactory creation is expensive and should be reused safely."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ix03">
+        <description>Problem: creating XPathFactory instances repeatedly is expensive.&#13;
+            Solution: reuse the factory and, when shared across threads, store it in a ThreadLocal. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('javax.xml.xpath.XPathFactory#newInstance(*)')
+    and not(ancestor::PropertyDeclaration[
+        not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+        and pmd-kotlin:typeIs('java.lang.ThreadLocal')
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import javax.xml.xpath.XPathFactory
+class Bad {
+    fun bad() {
+        val xpath = XPathFactory.newInstance().newXPath() // bad
+    }
+}
+class Good {
+    private val xpathFactory: ThreadLocal<javax.xml.xpath.XPathFactory> = ThreadLocal.withInitial { XPathFactory.newInstance() }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidTimeUnitConfusion"
+          message="Numeric time-related properties or parameters should use an explicit time unit type."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ituc01">
+        <description>Problem: numeric time-related values such as timeout or ttl are ambiguous without an explicit unit.&#13;
+            Solution: use a type with unit semantics, such as kotlin.time.Duration, or encode the unit clearly in the identifier. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    (pmd-kotlin:typeIs('kotlin.Int') or pmd-kotlin:typeIs('kotlin.Long')
+     or pmd-kotlin:typeIs('java.lang.Integer') or pmd-kotlin:typeIs('java.lang.Long'))
+    and (
+        ends-with(lower-case(VariableDeclaration/@Identifier), 'timetolive')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'time_to_live')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'time')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'timeout')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'time_out')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'duration')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'durationout')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'duration_out')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'ttl')
+        or ends-with(lower-case(VariableDeclaration/@Identifier), 'timestamp')
+    )
+]
+|
+//FunctionValueParameter[
+    (pmd-kotlin:typeIs('kotlin.Int') or pmd-kotlin:typeIs('kotlin.Long')
+     or pmd-kotlin:typeIs('java.lang.Integer') or pmd-kotlin:typeIs('java.lang.Long'))
+    and (
+        ends-with(lower-case(Parameter/SimpleIdentifier/*/@Text), 'timetolive')
+        or ends-with(lower-case(Parameter/SimpleIdentifier/*/@Text), 'time_to_live')
+        or ends-with(lower-case(Parameter/SimpleIdentifier/*/@Text), 'time')
+        or ends-with(lower-case(Parameter/SimpleIdentifier/*/@Text), 'timeout')
+        or ends-with(lower-case(Parameter/SimpleIdentifier/*/@Text), 'time_out')
+        or ends-with(lower-case(Parameter/SimpleIdentifier/*/@Text), 'duration')
+        or ends-with(lower-case(Parameter/SimpleIdentifier/*/@Text), 'durationout')
+        or ends-with(lower-case(Parameter/SimpleIdentifier/*/@Text), 'duration_out')
+        or ends-with(lower-case(Parameter/SimpleIdentifier/*/@Text), 'ttl')
+        or ends-with(lower-case(Parameter/SimpleIdentifier/*/@Text), 'timestamp')
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad {
+    val connectionTimeout: Int = 5000 // bad
+    fun setTtl(ttl: Long) = ttl // bad
+}
+class Good {
+    fun setTimeout(timeout: kotlin.time.Duration) = timeout // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="UnconditionalOperationOnLogArgument"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Operation is executed regardless of log level and can be expensive"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ilo05">
+        <description>Problem: obj.toString() is executed regardless of log level for direct SLF4J trace/debug/info calls.
+            Solution: pass the object directly with SLF4J placeholders or use a lazy logging API. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-low" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.slf4j.Logger#trace(*)')
+    or pmd-kotlin:matchesSig('org.slf4j.Logger#debug(*)')
+    or pmd-kotlin:matchesSig('org.slf4j.Logger#info(*)')
+]
+[.//PostfixUnaryExpression[
+    PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = 'toString'
+    and not(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument)
+]]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad(obj: Any) {
+        log.debug(obj.toString()) // bad
+    }
+
+    fun good(obj: Any) {
+        log.debug("{}", obj) // good
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidUnconditionalBuiltLogStrings"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid building StringBuilder/StringBuffer log messages unconditionally."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ilo04">
+        <description>Problem: eagerly building StringBuilder/StringBuffer based log messages performs work regardless of log level.
+            Solution: use SLF4J placeholders or guard the statement with a log level check. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    ancestor::FunctionBody
+    and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) = 1
+    and (
+        pmd-kotlin:matchesSig('org.slf4j.Logger#trace(*)')
+        or pmd-kotlin:matchesSig('org.slf4j.Logger#debug(*)')
+        or pmd-kotlin:matchesSig('org.slf4j.Logger#info(*)')
+        or PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = 'log'
+    )
+    and PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument//PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+        ancestor::FunctionBody[1]//PropertyDeclaration[
+            ancestor::FunctionBody
+            and (
+                pmd-kotlin:typeIs('java.lang.StringBuilder')
+                or pmd-kotlin:typeIs('java.lang.StringBuffer')
+                or Expression//PostfixUnaryExpression[
+                    pmd-kotlin:matchesSig('java.lang.StringBuilder#<init>(*)')
+                    or pmd-kotlin:matchesSig('java.lang.StringBuilder#<init>()')
+                    or pmd-kotlin:matchesSig('java.lang.StringBuffer#<init>(*)')
+                    or pmd-kotlin:matchesSig('java.lang.StringBuffer#<init>()')
+                ]
+                or Expression//PrimaryExpression[SimpleIdentifier/*/@Text = ('StringBuilder', 'StringBuffer')]
+            )
+        ]/VariableDeclaration/@Identifier
+    and not(
+        ancestor::IfExpression[
+            .//PostfixUnaryExpression[
+                PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = ('isTraceEnabled', 'isDebugEnabled', 'isInfoEnabled')
+            ]
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad(userId: String) {
+        val sb = StringBuilder().append("User: ").append(userId)
+        log.debug(sb.toString()) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="UnconditionalCreatedLogArguments"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid unconditional creation of a log argument, it may not be needed."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#il06">
+        <description>Problem: creating log arguments eagerly does work regardless of the active log level.&#13;
+            Solution: build such arguments conditionally behind an enabled check, or pass cheaper values directly. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    ancestor::FunctionBody
+    and PrimaryExpression/SimpleIdentifier/*/@Text = 'log'
+    and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = ('trace', 'debug', 'info')
+    and not(
+        ancestor::IfExpression[
+            .//PostfixUnaryExpression[
+                PrimaryExpression/SimpleIdentifier/*/@Text = 'log'
+                and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = ('isTraceEnabled', 'isDebugEnabled', 'isInfoEnabled')
+            ]
+        ]
+    )
+    and PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument/Expression//PrimaryExpression/SimpleIdentifier/*/@Text =
+        ancestor::FunctionBody[1]//PropertyDeclaration[
+            not(ancestor::LambdaLiteral)
+            and Expression//PostfixUnaryExpression[
+                not(ancestor::ValueArgument)
+                and PostfixUnarySuffix/CallSuffix
+                and not(PostfixUnarySuffix/NavigationSuffix[starts-with(SimpleIdentifier/*/@Text, 'get')])
+            ]
+        ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.slf4j.Logger
+
+class EventBuilder {
+    fun build(): String = "event"
+}
+class LogService(private val log: Logger) {
+    fun bad() {
+        val event = EventBuilder().build()
+        log.debug("Processing: {}", event) // bad
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidUnnecessaryStringBuilderCreation"
+          language="kotlin"
+          message="Use concatenation (+) instead of new StringBuilder if only one statement."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isc05">
+        <description>Problem: Creating a StringBuilder and using append in one chained statement is more verbose than direct concatenation or a Kotlin string template.
+            Solution: use concatenation or string templates for one-off expressions. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    ancestor::FunctionBody
+    and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = 'toString'
+    and .//PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = 'append'
+    and .//PrimaryExpression[SimpleIdentifier/*/@Text='StringBuilder']
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Greeter {
+    fun bad(name: String): String {
+        return StringBuilder().append("hello").append(name).toString() // bad
+    }
+
+    fun good(name: String): String {
+        return "hello$name" // good
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidMutableLists"
+          language="kotlin"
+          message="List is mutable; prefer val with an immutable List."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iml01">
+        <description>Problem: mutable list properties are easier to modify accidentally and are less safe to share.
+            Solution: prefer val with List/listOf/emptyList, except for persistence and configuration special cases. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and @Mutable = true()
+    and (
+        pmd-kotlin:typeIs('java.util.ArrayList')
+        or pmd-kotlin:typeIs('kotlin.collections.MutableList')
+    )
+    and not(pmd-kotlin:hasAnnotation('OneToMany'))
+    and not(pmd-kotlin:hasAnnotation('ManyToMany'))
+    and not(ancestor::ClassDeclaration[pmd-kotlin:hasAnnotation('ConfigurationProperties')])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Foo {
+    var items: MutableList<String> = mutableListOf() // bad
+    val names: List<String> = emptyList() // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="ImproperVariableName"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Improper variable name."
+          externalInfoUrl="${doc_root}/JavaCodeQuality.md#m01">
+        <description>Problem: non descriptive variable names such as value, int1, or var1 make code harder to understand.&#13;
+            Solution: use domain specific names that communicate intent. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(
+//VariableDeclaration[
+    matches(@Identifier, '^(VALUE|VAL|INTEGER|INT|LONG|NUMBER|NUM|[0-9]+|ZERO|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|TWENTY|_)+$', 'i')
+    or matches(@Identifier, '^var[0-9]+$')
+]
+|
+//FunctionValueParameter/Parameter[matches(SimpleIdentifier/*/@Text, '^(VALUE|VAL|INTEGER|INT|LONG|NUMBER|NUM|[0-9]+|ZERO|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|TWENTY|_)+$', 'i')
+    or matches(SimpleIdentifier/*/@Text, '^var[0-9]+$')
+]
+)
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class BadNames {
+    val value: Int = 0 // bad
+
+    fun process(var1: String) {} // bad
+
+    val connectionTimeout: Int = 5000 // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="UsingSuppressWarnings"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Audit uses of suppression annotations."
+          externalInfoUrl="${doc_root}/JavaCodeQuality.md#m02">
+        <description>Problem: suppressing warnings can hide issues that should be reviewed explicitly.&#13;
+            Solution: audit suppression annotations and narrow them where possible. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//StringLiteral[
+    ancestor::Annotation[.//UserType/SimpleUserType/SimpleIdentifier/*/@Text = ('Suppress', 'SuppressWarnings')]
+    and LineStringLiteral/LineStringContent/T-LineStrText[
+        matches(@Text, $ruleIdMatches)
+        and not(matches(@Text, $ruleIdNotMatches))
+    ]
+]
+                ]]></value>
+            </property>
+            <property name="ruleIdMatches" type="String" value=".*" description="Regex for inclusion of rules"/>
+            <property name="ruleIdNotMatches" type="String" value="^$" description="Regex for exclusion of rules"/>
+        </properties>
+        <example><![CDATA[
+@Suppress("PMD.UnconditionalCreatedLogArguments") // bad
+fun process() {}
+        ]]></example>
+    </rule>
+
+    <rule name="UsingSuppressWarningsHighRisk"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Audit uses of high risk suppression annotations."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isw01">
+        <description>Problem: suppressing high risk rules can hide concurrency or shared state defects.&#13;
+            Solution: review and remove these suppressions whenever possible. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//StringLiteral[
+    ancestor::Annotation[.//UserType/SimpleUserType/SimpleIdentifier/*/@Text = ('Suppress', 'SuppressWarnings')]
+    and LineStringLiteral/LineStringContent/T-LineStrText[
+        matches(@Text, $ruleIdMatches)
+        and not(matches(@Text, $ruleIdNotMatches))
+    ]
+]
+                ]]></value>
+            </property>
+            <property name="ruleIdMatches" type="String" value="AvoidUserDataInSharedObjects|AvoidUnguardedMutableFieldsInSharedObjects|AvoidUnguardedAssignmentToNonFinalFieldsInSharedObjects|AvoidMutableStaticFields|[^\w]ALL[^\w]|[^\w]all[^\w]|PMD[^\.]|pmd[^:]" description="Regex for inclusion of high risk rules"/>
+            <property name="ruleIdNotMatches" type="String" value="^$" description="Regex for exclusion of high risk rules"/>
+        </properties>
+        <example><![CDATA[
+@Suppress("AvoidMutableStaticFields") // bad
+fun process() {}
+        ]]></example>
+    </rule>
+
+    <rule name="OptimizeMapOrSetForEnum"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Map has enum keys or Set has enum elements, use EnumMap or EnumSet for more efficiency."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#iuoc03">
+        <description>Problem: HashMap and HashSet are relatively memory hungry for enum keys and elements.&#13;
+            Solution: prefer EnumMap or EnumSet when the key or element type is an enum declared in the same Kotlin file. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,memory,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/SimpleIdentifier/*/@Text = ('Map', 'HashMap', 'LinkedHashMap', 'MutableMap')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]/SimpleIdentifier/*/@Text =
+        ancestor::KotlinFile[1]//ClassDeclaration[Modifiers//T-ENUM]/@Identifier
+    and Expression//PostfixUnaryExpression[
+        not(ancestor::ValueArgument)
+        and PrimaryExpression/SimpleIdentifier/*/@Text != 'EnumMap'
+    ]
+]
+|
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/SimpleIdentifier/*/@Text = ('Set', 'HashSet', 'MutableSet')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]/SimpleIdentifier/*/@Text =
+        ancestor::KotlinFile[1]//ClassDeclaration[Modifiers//T-ENUM]/@Identifier
+    and Expression//PostfixUnaryExpression[
+        not(ancestor::ValueArgument)
+        and PrimaryExpression/SimpleIdentifier/*/@Text != 'EnumSet'
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.EnumMap
+import java.util.EnumSet
+import java.util.HashMap
+import java.util.HashSet
+
+enum class Status { ACTIVE, INACTIVE }
+class Bad {
+    val statusMap: HashMap<Status, String> = HashMap() // bad
+    val statusSet: HashSet<Status> = HashSet() // bad
+}
+class Good {
+    val statusMap: EnumMap<Status, String> = EnumMap(Status::class.java)
+    val statusSet: EnumSet<Status> = EnumSet.allOf(Status::class.java)
+}
+        ]]></example>
+    </rule>
+
+    <rule name="NonComparableMapKeys"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Map uses a non comparable key type."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#inck01">
+        <description>Problem: map declarations with non comparable key types often lead to inefficient or unclear key handling.&#13;
+            Solution: prefer comparable key types, or use a TreeMap with an explicit comparator. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/SimpleIdentifier/*/@Text = ('Map', 'HashMap', 'LinkedHashMap', 'MutableMap')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]
+        [not(SimpleIdentifier/*/@Text = ('String', 'Int', 'Long', 'Short', 'Byte', 'Double', 'Float', 'Char', 'Boolean', 'UInt', 'ULong', 'UShort', 'UByte', 'BigDecimal', 'BigInteger', 'UUID', 'Comparable'))]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.HashMap
+
+class BadMapKeys {
+    val map: Map<BadKey, String> = HashMap() // bad
+}
+
+class BadKey
+        ]]></example>
+    </rule>
+
+    <rule name="NonComparableSetElements"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Set uses a non comparable element type."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#inck02">
+        <description>Problem: set lookups on non comparable element types can be unclear and error prone.&#13;
+            Solution: use comparable element types, or use an ordered set with an explicit comparator. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/SimpleIdentifier/*/@Text = ('Set', 'HashSet', 'MutableSet')
+    and VariableDeclaration/Type/TypeReference/UserType/SimpleUserType[1]/TypeArguments/TypeProjection[1]/Type/TypeReference/UserType/SimpleUserType[1]
+        [not(SimpleIdentifier/*/@Text = ('String', 'Int', 'Long', 'Short', 'Byte', 'Double', 'Float', 'Char', 'Boolean', 'UInt', 'ULong', 'UShort', 'UByte', 'BigDecimal', 'BigInteger', 'UUID', 'Comparable'))]
+    and VariableDeclaration/@Identifier = ancestor::ClassDeclaration[1]//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = ('contains', 'containsAll', 'remove', 'removeAll', 'retainAll')
+    ]/PrimaryExpression/SimpleIdentifier/T-Identifier/@Text
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.HashSet
+
+class BadSetElements {
+    fun bad(elem: BadElement): Boolean {
+        val values: HashSet<BadElement> = HashSet() // bad
+        return values.contains(elem)
+    }
+}
+
+class BadElement
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidDuplicateAssignmentsInCases"
+          message="Avoid duplicate assignments in different when branches"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodeQuality.md#SSC01">
+        <description>Problem: assigning the same variable to the same value in multiple when branches often indicates a bug.&#13;
+            Solution: use distinct assignments per branch or move common logic outside the when expression. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,suspicious" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//WhenEntry[
+    ControlStructureBody//Assignment[
+        DirectlyAssignableExpression//SimpleIdentifier/*/@Text =
+            ancestor::WhenEntry[1]/preceding-sibling::WhenEntry/ControlStructureBody//Assignment/DirectlyAssignableExpression//SimpleIdentifier/*/@Text
+        and (
+            .//T-LineStrText/@Text =
+                ancestor::WhenEntry[1]/preceding-sibling::WhenEntry/ControlStructureBody//Assignment//T-LineStrText/@Text
+            or
+            .//LiteralConstant/@Text =
+                ancestor::WhenEntry[1]/preceding-sibling::WhenEntry/ControlStructureBody//Assignment//LiteralConstant/@Text
+        )
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+when (type) {
+    "A" -> result = "same"
+    "B" -> result = "same" // bad
+    else -> result = "other"
+}
+        ]]></example>
+    </rule>
+
+    <rule name="ImplementEqualsHashCodeOnValueObjects"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Regular value objects with multiple properties should implement equals and hashCode, or be a data class."
+          externalInfoUrl="${doc_root}/JavaCodeQuality.md#ssw01">
+        <description>Problem: regular value objects with multiple properties but no equals/hashCode are easy to misuse in collections and comparisons.
+            Solution: use a Kotlin data class or implement equals and hashCode explicitly. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//ClassDeclaration[
+    not(Modifiers//T-DATA)
+    and not(pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service'))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component'))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller'))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.stereotype.Repository'))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.web.bind.annotation.RestController'))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Configuration'))
+    and not(pmd-kotlin:hasAnnotation('jakarta.persistence.Entity'))
+    and not(pmd-kotlin:hasAnnotation('javax.persistence.Entity'))
+    and not(.//DelegationSpecifier[pmd-kotlin:typeIs('java.lang.Throwable')])
+    and (
+        count(ClassBody//PropertyDeclaration[not(ancestor::FunctionBody or ancestor::LambdaLiteral)])
+        + count(PrimaryConstructor//ClassParameter[@Identifier])
+    ) >= 2
+    and not(ClassBody//FunctionDeclaration[@Identifier='equals' and count(FunctionValueParameters//FunctionValueParameter) = 1])
+    and not(ClassBody//FunctionDeclaration[@Identifier='hashCode' and not(FunctionValueParameters//FunctionValueParameter)])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Point(val x: Int, val y: Int) // bad: prefer data class
+        ]]></example>
+    </rule>
+
+    <rule name="EqualsOperationInconsistentWithHashCode"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="equals applies case normalization that hashCode does not."
+          externalInfoUrl="${doc_root}/JavaCodeQuality.md#ieah02">
+        <description>Problem: normalizing text in equals but not in hashCode makes object identity inconsistent for hash-based collections.
+            Solution: use the same normalization in both equals and hashCode. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="correctness,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//FunctionDeclaration[
+    @Identifier='equals'
+    and count(FunctionValueParameters//FunctionValueParameter) = 1
+    and FunctionBody//PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('java.lang.String#toLowerCase(*)')
+        or pmd-kotlin:matchesSig('kotlin.String#lowercase(*)')
+        or pmd-kotlin:matchesSig('java.lang.String#toUpperCase(*)')
+        or pmd-kotlin:matchesSig('kotlin.String#uppercase(*)')
+    ]
+    and ancestor::ClassBody[1]//FunctionDeclaration[
+        @Identifier='hashCode'
+        and not(FunctionValueParameters//FunctionValueParameter)
+        and not(FunctionBody//PostfixUnaryExpression[
+            pmd-kotlin:matchesSig('java.lang.String#toLowerCase(*)')
+            or pmd-kotlin:matchesSig('kotlin.String#lowercase(*)')
+            or pmd-kotlin:matchesSig('java.lang.String#toUpperCase(*)')
+            or pmd-kotlin:matchesSig('kotlin.String#uppercase(*)')
+        ])
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad(private val name: String) {
+    override fun equals(other: Any?): Boolean = other is Bad && name.lowercase() == other.name.lowercase()
+    override fun hashCode(): Int = name.hashCode() // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="FieldOfHashCodeMissingInEquals"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="A property is used in hashCode but not in equals."
+          externalInfoUrl="${doc_root}/JavaCodeQuality.md#ieah05">
+        <description>Problem: using a property in hashCode but omitting it from equals can make objects behave unexpectedly in hash-based collections.
+            Solution: use the same relevant properties in both equals and hashCode. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="correctness,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+][
+    VariableDeclaration/@Identifier = ancestor::ClassBody[1]//FunctionDeclaration[
+        @Identifier='hashCode' and not(FunctionValueParameters//FunctionValueParameter)
+    ]/FunctionBody//SimpleIdentifier/T-Identifier/@Text
+    and not(
+        VariableDeclaration/@Identifier = ancestor::ClassBody[1]//FunctionDeclaration[
+            @Identifier='equals' and count(FunctionValueParameters//FunctionValueParameter) = 1
+        ]/FunctionBody//SimpleIdentifier/T-Identifier/@Text
+    )
+    and not(
+        VariableDeclaration/@Identifier = ancestor::ClassBody[1]//FunctionDeclaration[
+            @Identifier='hashCode' and not(FunctionValueParameters//FunctionValueParameter)
+        ]/FunctionBody//Assignment//(DirectlyAssignableExpression|AssignableExpression)//T-Identifier/@Text
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad(id: String, name: String) {
+    private val id = id
+    private val name = name // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="MissingFieldInEquals"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Property assigned from construction is missing in equals method."
+          externalInfoUrl="${doc_root}/JavaCodeQuality.md#ieah04">
+        <description>Problem: if a property that participates in object state is omitted from equals, object equality can become inconsistent.&#13;
+            Solution: include all relevant constructed properties in equals and hashCode. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,suspicious" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and @Mutable = false()
+][
+    ancestor::ClassBody[1]//FunctionDeclaration[
+        @Identifier = 'equals'
+        and count(FunctionValueParameters//FunctionValueParameter) = 1
+        and not(FunctionBody//ThrowExpression)
+    ]
+    and not(
+        let $name := VariableDeclaration/@Identifier
+        return ancestor::ClassBody[1]//FunctionDeclaration[
+            @Identifier = 'equals'
+            and count(FunctionValueParameters//FunctionValueParameter) = 1
+        ]/FunctionBody//SimpleIdentifier/T-Identifier[@Text = $name]
+    )
+    and (
+        let $name := VariableDeclaration/@Identifier
+        return
+            ancestor::ClassDeclaration[1]/PrimaryConstructor//ClassParameter[@Identifier = $name]
+            or ancestor::ClassBody[1]//AnonymousInitializer//SimpleIdentifier/T-Identifier[@Text = $name]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad(id: String, name: String) {
+    private val id = id
+    private val name = name // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="MissingFieldInHashCode"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Equals uses a property which is missing in hashCode."
+          externalInfoUrl="${doc_root}/JavaCodeQuality.md#ieah03">
+        <description>Problem: using fewer properties in hashCode than in equals can degrade hash-based collection performance and violate expectations.&#13;
+            Solution: use the same relevant properties in equals and hashCode. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+][
+    ancestor::ClassBody[1]//FunctionDeclaration[
+        @Identifier = 'hashCode'
+        and not(FunctionValueParameters//FunctionValueParameter)
+    ]
+    and (
+        let $name := VariableDeclaration/@Identifier
+        return count(
+            ancestor::ClassBody[1]//FunctionDeclaration[
+                @Identifier = 'equals'
+                and count(FunctionValueParameters//FunctionValueParameter) = 1
+            ]/FunctionBody//SimpleIdentifier/T-Identifier[@Text = $name]
+        ) > 0
+        and count(
+            ancestor::ClassBody[1]//FunctionDeclaration[
+                @Identifier = 'hashCode'
+                and not(FunctionValueParameters//FunctionValueParameter)
+            ]/FunctionBody//SimpleIdentifier/T-Identifier[@Text = $name]
+        ) = 0
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad(id: String, name: String) {
+    private val id = id
+    private val name = name // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="HashCodeOnlyCallsSuper"
+          language="kotlin"
+          message="hashCode only calls super."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#isio03">
+        <description>Problem: when equals is implemented, hashCode needs a consistent implementation too. If hashCode only calls super.hashCode(), equal objects may behave incorrectly in hash-based collections.&#13;
+            Solution: implement hashCode using the same relevant properties as equals. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="correctness,jpinpoint-rule" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//FunctionDeclaration[
+    @Identifier = 'hashCode'
+    and not(FunctionValueParameters//FunctionValueParameter)
+    and FunctionBody[
+        count(.//NavigationSuffix[SimpleIdentifier/*/@Text = 'hashCode']) = 1
+        and .//SuperExpression
+    ]
+][
+    ancestor::ClassBody[1]//FunctionDeclaration[
+        @Identifier = 'equals'
+        and count(FunctionValueParameters//FunctionValueParameter) = 1
+        and not(
+            FunctionBody[
+                count(.//NavigationSuffix[SimpleIdentifier/*/@Text = 'equals']) = 1
+                and .//SuperExpression
+            ]
+        )
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class Bad(private val id: String) {
+    override fun equals(other: Any?): Boolean = other is Bad && id == other.id
+    override fun hashCode(): Int = super.hashCode() // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidInfiniteRecursion"
+          language="kotlin"
+          message="Avoid recursive calls without a proper stop condition."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ipf01">
+        <description>Problem: recursive calls without a clear stop condition can overflow the stack or loop forever.&#13;
+            Solution: add a terminating condition or rewrite as iteration. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PrimaryExpression[SimpleIdentifier/*/@Text = ancestor::FunctionDeclaration[1]/@Identifier]
+    and PostfixUnarySuffix/CallSuffix
+    and not(.//NavigationSuffix)
+    and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) =
+        count(ancestor::FunctionDeclaration[1]/FunctionValueParameters//FunctionValueParameter)
+    and not(PostfixUnarySuffix/CallSuffix//AdditiveOperator)
+    and not(PostfixUnarySuffix/CallSuffix//MultiplicativeOperator)
+    and not(ancestor::FunctionDeclaration[1]//IfExpression[.//ComparisonExpression])
+    and not(ancestor::FunctionDeclaration[1]//WhenExpression[.//ComparisonExpression])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun recurse(n: Int) {
+    recurse(n) // bad
+}
+        ]]></example>
+    </rule>
+
 </ruleset>

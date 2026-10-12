@@ -231,6 +231,12 @@
             <artifactId>joda-time</artifactId>
             <version>2.14.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.threeten</groupId>
+            <artifactId>threetenbp</artifactId>
+            <version>1.7.1</version>
+            <scope>test</scope>
+        </dependency>
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>

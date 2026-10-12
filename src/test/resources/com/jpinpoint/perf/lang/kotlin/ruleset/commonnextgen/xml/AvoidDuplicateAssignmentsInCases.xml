@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: duplicate assignment in two when branches</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+class BadWhen {
+    fun render(type: String) {
+        var result = ""
+        when (type) {
+            "A" -> result = "case1"
+            "B" -> result = "case1" // bad
+            "C" -> result = "case2"
+        }
+        println(result)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: when used as an expression</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodWhenExpression {
+    fun render(type: String): String {
+        return when (type) {
+            "A" -> "case1"
+            "B" -> "case2"
+            else -> "default"
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: different values assigned in each branch</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodWhenAssignments {
+    fun render(type: String) {
+        var result = ""
+        when (type) {
+            "A" -> result = "case1"
+            "B" -> result = "case2"
+            else -> result = "default"
+        }
+        println(result)
+    }
+}
+        ]]></code>
+    </test-code>
+</test-data>

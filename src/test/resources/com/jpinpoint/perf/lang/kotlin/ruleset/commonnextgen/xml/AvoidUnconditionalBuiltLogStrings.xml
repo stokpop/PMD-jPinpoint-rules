@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>bad: StringBuilder variable passed to debug</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad(userId: String) {
+        val sb = StringBuilder().append("User: ").append(userId)
+        log.debug(sb.toString())
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: StringBuilder-based local message passed to trace</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun bad2(item: String) {
+        val msg = StringBuilder("Processing ").append(item).toString()
+        log.trace(msg)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: parameterized debug logging</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun good(userId: String) {
+        log.debug("User: {}", userId)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: debug logging guarded by level check</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.slf4j.Logger
+
+class LoggingService(private val log: Logger) {
+    fun good2(item: String) {
+        if (log.isDebugEnabled) {
+            log.debug("Processing: $item")
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+</test-data>

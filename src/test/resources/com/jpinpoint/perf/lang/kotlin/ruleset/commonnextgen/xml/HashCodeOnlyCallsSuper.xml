@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: custom equals with hashCode only calling super</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>8</expected-linenumbers>
+        <code><![CDATA[
+class BadHash(private val id: String) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is BadHash) return false
+        return id == other.id
+    }
+
+    override fun hashCode(): Int {
+        return super.hashCode() // bad
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: data class auto-generates equals and hashCode</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+data class GoodHash(val id: String)
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: equals and hashCode use the same field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodExplicit(private val id: String) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is GoodExplicit) return false
+        return id == other.id
+    }
+
+    override fun hashCode(): Int {
+        return id.hashCode()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: class without equals or hashCode overrides</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class PlainHash(private val id: String)
+        ]]></code>
+    </test-code>
+</test-data>

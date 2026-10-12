@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: recursive call without any guard</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>3</expected-linenumbers>
+        <code><![CDATA[
+class BadRecurse {
+    fun recurse(n: Int) {
+        recurse(n) // bad
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: expression body recurses directly</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class BadExpressionRecurse {
+    fun recurse(n: Int): Int = recurse(n) // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: recursion guarded with comparison and decrement</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodRecurse {
+    fun recurse(n: Int): Int = if (n <= 0) 0 else recurse(n - 1)
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: tailrec function decreases argument</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodFactorial {
+    tailrec fun factorial(n: Int, acc: Int = 1): Int =
+        if (n <= 1) acc else factorial(n - 1, acc * n)
+}
+        ]]></code>
+    </test-code>
+</test-data>

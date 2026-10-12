@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: property named value</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class BadValue {
+    val value: Int = 0
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: property named int1</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class BadInt1 {
+    val int1: Int = 1
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: parameter named var1</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class BadParam {
+    fun process(var1: String) {}
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: property named VALUE_42</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>2</expected-linenumbers>
+        <code><![CDATA[
+class BadUpperNumber {
+    val VALUE_42: Int = 42
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: descriptive names</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class GoodNames {
+    val connectionTimeout: Int = 5000
+    val maxRetries: Int = 3
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
