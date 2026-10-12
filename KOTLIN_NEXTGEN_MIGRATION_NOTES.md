@@ -17,7 +17,7 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 
 ## Status (as of this note)
 
-22 of ~103 candidate rule changes migrated and committed, all tests green:
+27 of ~103 candidate rule changes migrated and committed, all tests green:
 
 | # | Rule | Nextgen file | Commit |
 |---|------|--------------|--------|
@@ -38,11 +38,16 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 | 15 | AvoidUnguardedAssignmentToNonFinalFieldsInObjectsUsingSynchronized | concurrentnextgen.xml | 7f95c440 |
 | 16 | AvoidUnguardedMutableFieldsInSharedObjects | concurrentnextgen.xml | 7f95c440 |
 | 17 | AvoidUnguardedMutableFieldsInObjectsUsingSynchronized | concurrentnextgen.xml | 7f95c440 |
-| 18 | AvoidUnguardedMutableInheritedFieldsInSharedObjects | concurrentnextgen.xml | (this commit) |
-| 19 | NotProperlySynchronizingOnThisWhileUsingGuardedBy | concurrentnextgen.xml | (this commit) |
-| 20 | NotProperlySynchronizingOnFieldWhileUsingGuardedBy | concurrentnextgen.xml | (this commit) |
-| 21 | WrongUseOfGuardedBy | concurrentnextgen.xml | (this commit) |
-| 22 | AvoidParallelFlux | concurrentnextgen.xml | (this commit) |
+| 18 | AvoidUnguardedMutableInheritedFieldsInSharedObjects | concurrentnextgen.xml | c68248e9 |
+| 19 | NotProperlySynchronizingOnThisWhileUsingGuardedBy | concurrentnextgen.xml | c68248e9 |
+| 20 | NotProperlySynchronizingOnFieldWhileUsingGuardedBy | concurrentnextgen.xml | c68248e9 |
+| 21 | WrongUseOfGuardedBy | concurrentnextgen.xml | c68248e9 |
+| 22 | AvoidParallelFlux | concurrentnextgen.xml | c68248e9 |
+| 23 | AvoidThreadUnsafeJaxbUsage | concurrentnextgen.xml | (this commit) |
+| 24 | AvoidReactorOnEachOperator | concurrentnextgen.xml | (this commit) |
+| 25 | AvoidMDCInReactor | concurrentnextgen.xml | (this commit) |
+| 26 | AvoidNonAtomicIfModifyOnConcurrentMap | concurrentnextgen.xml | (this commit) |
+| 27 | AvoidUserDataInSharedObjects | concurrentnextgen.xml | (this commit) |
 
 ## Full remaining scope
 
@@ -75,9 +80,7 @@ AvoidSimpleDateFormat, AvoidStringBuffer, AvoidWideScopeXPathExpression, AvoidXP
 MDCPutWithoutRemove
 
 Remaining concurrent.xml rules:
-AvoidThreadUnsafeJaxbUsage, AvoidReactorOnEachOperator,
-AvoidMDCInReactor, AvoidNonAtomicIfModifyOnConcurrentMap,
-AvoidUserDataInSharedObjects, AvoidVolatileInPrototypeScope,
+AvoidVolatileInPrototypeScope,
 AvoidMutableCollectionInParallelStreamForEach
 (NB: `SetQueueCapacityForTaskExecutor` also appears under concurrent.xml in the source branch, but is
 a stale duplicate — resolved below, only the remoting.xml version is migrated)

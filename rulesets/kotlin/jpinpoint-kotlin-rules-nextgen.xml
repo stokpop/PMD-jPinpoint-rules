@@ -348,6 +348,48 @@ class Counter {
         ]]></example>
     </rule>
 
+    <rule name="AvoidMDCInReactor"
+          message="Avoid using MDC in a Reactor pipeline; MDC is thread-local and does not propagate across Reactor scheduler threads."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi14">
+        <description>Problem: MDC (Mapped Diagnostic Context) is stored in ThreadLocal, which is not propagated by Reactor's scheduler thread switches.
+            Solution: Use Reactor's Context API or Micrometer Context Propagation for tracing context in reactive pipelines.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.slf4j.MDC#setContextMap(*)')
+    and (
+        ancestor::FunctionDeclaration[
+            pmd-kotlin:typeIs('reactor.core.publisher.Flux')
+            or pmd-kotlin:typeIs('reactor.core.publisher.Mono')
+        ]
+        or ancestor::FunctionDeclaration/FunctionValueParameters//FunctionValueParameter[
+            pmd-kotlin:typeIs('reactor.util.context.Context')
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.slf4j.MDC
+import reactor.core.publisher.Flux
+class Service {
+    fun process(items: List<String>): Flux<String> {
+        MDC.setContextMap(mapOf("traceId" to "x")) // bad: MDC not propagated across Reactor schedulers
+        return Flux.fromIterable(items)
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
     <rule name="AvoidMutableStaticFields"
           message="Avoid mutable static fields. Make val (immutable) or use thread-safe access with @Volatile or @GuardedBy."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
@@ -384,6 +426,45 @@ class Good {
         @Volatile
         var running: Boolean = false // ok: volatile
     }
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidNonAtomicIfModifyOnConcurrentMap"
+          message="Non-atomic if-modify used on a ConcurrentMap; use putIfAbsent, computeIfAbsent, or compute instead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#cac09">
+        <description>Problem: A check-then-act on a ConcurrentMap (e.g. containsKey followed by put) is a race condition.
+            Between the check and the put, another thread may have already inserted the key.
+            Solution: Use atomic operations: putIfAbsent, computeIfAbsent, or compute.
+            In Kotlin, getOrPut is also available for kotlin.collections.MutableMap.
+            (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//IfExpression[
+    .//PostfixUnaryExpression[pmd-kotlin:matchesSig('java.util.concurrent.ConcurrentMap#containsKey(*)')]
+    and ControlStructureBody//PostfixUnaryExpression[
+        pmd-kotlin:matchesSig('java.util.concurrent.ConcurrentMap#put(*)')
+        or pmd-kotlin:matchesSig('java.util.Map#put(*)')
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.util.concurrent.ConcurrentHashMap
+class Cache {
+    private val store = ConcurrentHashMap<String, String>()
+    fun bad(key: String, value: String) {
+        if (!store.containsKey(key)) store.put(key, value) // bad: race condition
+    }
+    fun good(key: String, value: String) = store.putIfAbsent(key, value) // ok: atomic
 }
         ]]>
         </example>
@@ -548,6 +629,35 @@ class StreamService {
         ]]></example>
     </rule>
 
+    <rule name="AvoidReactorOnEachOperator"
+          message="Avoid using Reactor Hooks.onEachOperator; it instruments every operator and has significant overhead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi14">
+        <description>Problem: Hooks.onEachOperator adds instrumentation to every single Reactor operator, causing significant CPU overhead.
+            Solution: Use Hooks.onOperatorDebug() only during debugging, or use Micrometer Context Propagation for MDC propagation instead.
+            (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('reactor.core.publisher.Hooks#onEachOperator(*)')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import reactor.core.publisher.Hooks
+class AppConfig {
+    init {
+        Hooks.onEachOperator("key", operator) // bad: instruments every Reactor operator
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
     <rule name="AvoidStaticXmlFactories"
           message="XML Factory is used as static/object/companion field. XML factories are not thread-safe. Use local variables instead."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
@@ -591,6 +701,51 @@ class Bad {
     }
     fun parse(xml: String) {
         val localFactory = DocumentBuilderFactory.newInstance() // ok: local variable
+    }
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidThreadUnsafeJaxbUsage"
+          message="A JAXB Marshaller, Unmarshaller or Validator is used as a class field; they are not thread-safe."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#IUOXAR07">
+        <description>Problem: JAXB Marshaller, Unmarshaller and Validator are not thread-safe.
+            Solution: Create a new instance every time you need to marshal, unmarshal or validate.
+            Declare them as local variables in the function body or lambda, not as class fields.
+            (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    (: isWithin pattern :)
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and (pmd-kotlin:typeIs('javax.xml.bind.Marshaller')
+         or pmd-kotlin:typeIs('javax.xml.bind.Unmarshaller')
+         or pmd-kotlin:typeIs('javax.xml.bind.Validator')
+         or pmd-kotlin:typeIs('jakarta.xml.bind.Marshaller')
+         or pmd-kotlin:typeIs('jakarta.xml.bind.Unmarshaller')
+         or pmd-kotlin:typeIs('jakarta.xml.bind.Validator')
+         or pmd-kotlin:typeIs('javax.xml.validation.Validator'))
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import javax.xml.bind.JAXBContext
+import javax.xml.bind.Marshaller
+class Bad {
+    private val marshaller: Marshaller = JAXBContext.newInstance(Bad::class.java).createMarshaller() // bad: not thread-safe
+}
+class Good {
+    companion object { private val CTX = JAXBContext.newInstance(Good::class.java) }
+    fun marshal(obj: Good) {
+        val marshaller = CTX.createMarshaller() // ok: local variable
     }
 }
         ]]>
@@ -1211,6 +1366,50 @@ class Good : SomeParent() {
     fun mutateMapGood(key: String, value: String) {
         map.put(key, value) // good - synchronized
     }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidUserDataInSharedObjects"
+          message="Avoid storing user-specific mutable data in shared singleton objects."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#isc03">
+        <description>Problem: mutable user-related fields in singleton Spring beans can leak data between requests.&#13;
+            Solution: keep request data local, immutable, or scope the bean to the request. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="data-mix-up,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Same shared-object/scope handling as AvoidNonPrivateFieldsInSharedObjects. See that rule for why
+   hasAnnotation() is not called on the Annotation node itself. :)
+//ClassDeclaration[
+    (pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
+     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component')
+     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller')
+     or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Repository')
+     or pmd-kotlin:hasAnnotation('org.springframework.web.bind.annotation.RestController'))
+    and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
+    and not(
+        pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Scope')
+        and .//Annotation[.//SimpleIdentifier/*/@Text='Scope']//T-LineStrText[@Text='request' or @Text='prototype']
+    )
+]//PropertyDeclaration[
+    @Mutable = true()
+    (: isWithin pattern :)
+    and not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and not(pmd-kotlin:hasAnnotation('Volatile'))
+    and matches(lower-case(VariableDeclaration/@Identifier), '^(user(id|ref|reference)?|customer(id|ref|reference)?|session(id|ref|reference)?|order(id|ref|reference|list)?|account(id|ref|reference|list)?|transaction(id|ref|reference|list)?|contract(id|ref|reference|list)?)$')
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.stereotype.Service
+@Service
+class OrderService {
+    var orderId: String = "" // bad
 }
         ]]></example>
     </rule>

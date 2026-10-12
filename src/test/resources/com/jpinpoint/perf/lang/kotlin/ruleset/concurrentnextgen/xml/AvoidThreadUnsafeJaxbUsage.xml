@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: Marshaller as class field (javax)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.bind.JAXBContext
+import javax.xml.bind.Marshaller
+
+class Bad {
+    private val marshaller: Marshaller = JAXBContext.newInstance(Bad::class.java).createMarshaller() // bad: not thread-safe
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: Unmarshaller as class field (jakarta)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import jakarta.xml.bind.JAXBContext
+import jakarta.xml.bind.Unmarshaller
+
+class Bad {
+    private val unmarshaller: Unmarshaller = JAXBContext.newInstance(Bad::class.java).createUnmarshaller() // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: Validator as class field</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.bind.JAXBContext
+import javax.xml.bind.Validator
+
+@Suppress("DEPRECATION")
+class Bad {
+    private val validator: Validator = JAXBContext.newInstance(Bad::class.java).createValidator() // bad
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: Marshaller as local variable in function</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.bind.JAXBContext
+
+class Good {
+    companion object {
+        private val CTX = JAXBContext.newInstance(Good::class.java)
+    }
+    fun marshal(obj: Good) {
+        val marshaller = CTX.createMarshaller() // ok: local variable is thread-safe
+        marshaller.marshal(obj, java.io.StringWriter())
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: Marshaller created in lambda (local scope)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import javax.xml.bind.JAXBContext
+import javax.xml.bind.Marshaller
+
+val CTX = JAXBContext.newInstance(String::class.java)
+
+fun marshalAll(items: List<String>) = items.map { item ->
+    val m: Marshaller = CTX.createMarshaller() // ok: created per invocation inside lambda
+    java.io.StringWriter().also { m.marshal(item, it) }.toString()
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
