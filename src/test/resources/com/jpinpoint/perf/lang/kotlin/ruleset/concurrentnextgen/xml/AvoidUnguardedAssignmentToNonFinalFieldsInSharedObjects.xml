@@ -317,4 +317,52 @@ class ProductionScopedService {
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>good: property assignment on a function parameter object</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+
+@Component
+class Sample : Base() {
+    fun handle(response: Resp) {
+        response.status = 401
+        response.inner.code = 1
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: property assignment on a local object</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+
+@Component
+class Sample : Base() {
+    fun handle() {
+        val o = Resp()
+        o.status = 401
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: assignment to inherited field, plain and via this</description>
+        <expected-problems>2</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+
+@Component
+class Sample : Base() {
+    fun handle() {
+        inheritedField = 1
+        this.otherInherited = 2
+    }
+}
+        ]]></code>
+    </test-code>
+
 </test-data>

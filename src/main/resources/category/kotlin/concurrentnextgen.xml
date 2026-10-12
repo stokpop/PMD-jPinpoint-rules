@@ -383,6 +383,12 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
     (
       (: Case B: inherited field — class extends a base :)
       ancestor::ClassDeclaration//DelegationSpecifiers
+      (: only "x = v" or "this.x = v": in "obj.x = v" or "obj.a.b = v" the target belongs to another object
+         (a parameter, local or call result), not to an inherited field of this class :)
+      and (
+           parent::SimpleIdentifier/parent::DirectlyAssignableExpression
+        or ancestor::DirectlyAssignableExpression[1][count(AssignableSuffix) = 1][PostfixUnaryExpression/PrimaryExpression/ThisExpression]
+      )
       (: not in an init block (constructor-like) :)
       and not(ancestor::ClassBody/AnonymousInitializer)
       (: the name is NOT a known var field of THIS class (: isWithin pattern :) :)
