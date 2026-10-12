@@ -80,4 +80,28 @@ class BusinessException(message: String, val code: String, val description: Stri
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>good: interface with multiple properties has no state</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+interface Person {
+    val firstName: String
+    val lastName: String
+    val age: Int
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: sealed interface with properties and default getter</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+sealed interface Shape {
+    val width: Double
+    val height: Double
+    val area: Double get() = width * height
+}
+        ]]></code>
+    </test-code>
+
 </test-data>

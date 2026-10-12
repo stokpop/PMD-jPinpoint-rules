@@ -1737,7 +1737,8 @@ when (type) {
             <property name="xpath">
                 <value><![CDATA[
 //ClassDeclaration[
-    not(Modifiers//T-DATA)
+    not(T-INTERFACE)
+    and not(Modifiers//T-DATA)
     and not(pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service'))
     and not(pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component'))
     and not(pmd-kotlin:hasAnnotation('org.springframework.stereotype.Controller'))
