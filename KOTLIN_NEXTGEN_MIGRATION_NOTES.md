@@ -17,7 +17,7 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 
 ## Status (as of this note)
 
-47 of ~103 candidate rule changes migrated and committed, all tests green:
+52 of ~103 candidate rule changes migrated and committed, all tests green:
 
 | # | Rule | Nextgen file | Commit |
 |---|------|--------------|--------|
@@ -63,11 +63,16 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 | 40 | AvoidLeakingRetryEventConsumers | remotingnextgen.xml | 67dc4551 |
 | 41 | RetryCanCauseOverload | remotingnextgen.xml | 67dc4551 |
 | 42 | AvoidModifyingObjectMapper | remotingnextgen.xml | 67dc4551 |
-| 43 | AvoidDeprecatedHttpConnectors | remotingnextgen.xml | (this commit) |
-| 44 | DefaultFeignClientWithoutTLSConnectionReuse | remotingnextgen.xml | (this commit) |
-| 45 | AvoidHardcodedConnectionConfig | remotingnextgen.xml | (this commit) |
-| 46 | HttpClientImproperConnectionTimeouts | remotingnextgen.xml | (this commit) |
-| 47 | UseCloseableForHttpClient | remotingnextgen.xml | (this commit) |
+| 43 | AvoidDeprecatedHttpConnectors | remotingnextgen.xml | e41a69fe |
+| 44 | DefaultFeignClientWithoutTLSConnectionReuse | remotingnextgen.xml | e41a69fe |
+| 45 | AvoidHardcodedConnectionConfig | remotingnextgen.xml | e41a69fe |
+| 46 | HttpClientImproperConnectionTimeouts | remotingnextgen.xml | e41a69fe |
+| 47 | UseCloseableForHttpClient | remotingnextgen.xml | e41a69fe |
+| 48 | AvoidUnclearHttpRouteSecurity | remotingnextgen.xml | (this commit) |
+| 49 | AvoidDiscardingHttpClientConfig | remotingnextgen.xml | (this commit) |
+| 50 | HttpClientBuilderPoolSettingsIgnored | remotingnextgen.xml | (this commit) |
+| 51 | AxualProducerCreatedForEachMethodCall | remotingnextgen.xml | (this commit) |
+| 52 | AvoidClientHttpRequestFactorySupplier | remotingnextgen.xml | (this commit) |
 
 ## Full remaining scope
 
@@ -108,8 +113,6 @@ HttpClientBuilderWithoutTimeouts, AvoidDeprecatedHystrix, HttpClientBuilderWitho
 NettyConnectionProviderWithoutMaxOrTimeout, which are long-standing, newer than the kotlin-type-mapper
 versions and use no overlay - DO NOT migrate those 5; the type-mapper versions rely on a nonexistent
 @Identifier on NavigationSuffix/PrimaryExpression and fail 14 tests):
-AvoidUnclearHttpRouteSecurity, AvoidDiscardingHttpClientConfig, HttpClientBuilderPoolSettingsIgnored,
-AxualProducerCreatedForEachMethodCall, AvoidClientHttpRequestFactorySupplier,
 HttpInterceptorNotReleasingOnException, SetQueueCapacityForTaskExecutor (the canonical, type-aware
 version — see resolution below)
 

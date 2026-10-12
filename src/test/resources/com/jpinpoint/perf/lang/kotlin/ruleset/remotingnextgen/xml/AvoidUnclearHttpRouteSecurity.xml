@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: apache client 4 route with one argument</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.HttpHost
+import org.apache.http.conn.routing.HttpRoute
+
+class BadClient4 {
+    fun createRoute(): HttpRoute =
+        HttpRoute(HttpHost("example.com"))
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: apache client 5 route with two arguments</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>8</expected-linenumbers>
+        <code><![CDATA[
+import java.net.InetAddress
+import org.apache.hc.client5.http.HttpRoute
+import org.apache.hc.core5.http.HttpHost
+
+class BadClient5 {
+    fun createRoute(): HttpRoute {
+        val localAddress = InetAddress.getLocalHost()
+        return HttpRoute(HttpHost("example.com"), localAddress)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: secure flag specified explicitly</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.net.InetAddress
+import org.apache.http.HttpHost
+import org.apache.http.conn.routing.HttpRoute
+
+class GoodRoute {
+    fun createRoute(): HttpRoute {
+        val localAddress = InetAddress.getLocalHost()
+        return HttpRoute(localAddress, HttpHost("example.com"), true)
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

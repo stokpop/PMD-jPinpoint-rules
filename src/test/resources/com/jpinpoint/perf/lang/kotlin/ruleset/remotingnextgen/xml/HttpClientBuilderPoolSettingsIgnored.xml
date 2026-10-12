@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: setMaxConnTotal ignored after setConnectionManager in chain</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.impl.client.HttpClientBuilder
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
+
+class BadTotal {
+    fun build(poolMgr: PoolingHttpClientConnectionManager) {
+        HttpClientBuilder.create()
+            .setConnectionManager(poolMgr)
+            .setMaxConnTotal(200) // bad
+            .build()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>violation: setMaxConnPerRoute ignored on builder after setConnectionManager</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>8</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.http.impl.client.HttpClientBuilder
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
+
+class BadPerRoute {
+    fun build(poolMgr: PoolingHttpClientConnectionManager) {
+        val builder = HttpClientBuilder.create()
+        builder.setConnectionManager(poolMgr)
+        builder.setMaxConnPerRoute(10) // bad
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: pool sizes configured without connection manager</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.http.impl.client.HttpClientBuilder
+
+class GoodPoolSizes {
+    fun build() {
+        HttpClientBuilder.create()
+            .setMaxConnTotal(200)
+            .setMaxConnPerRoute(20)
+            .build()
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>no violation: connection manager configured without client pool sizes</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.apache.http.impl.client.HttpClientBuilder
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
+
+class GoodConnectionManager {
+    fun build(poolMgr: PoolingHttpClientConnectionManager) {
+        HttpClientBuilder.create()
+            .setConnectionManager(poolMgr)
+            .build()
+    }
+}
+        ]]></code>
+    </test-code>
+</test-data>

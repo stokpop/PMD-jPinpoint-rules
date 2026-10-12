@@ -1905,6 +1905,40 @@ class RightUseOfGuardedBy {
 
 <!-- END Included file 'concurrentnextgen.xml' -->
 <!-- BEGIN Included file 'remotingnextgen.xml' -->
+    <rule name="AvoidClientHttpRequestFactorySupplier"
+          language="kotlin"
+          message="Avoid ClientHttpRequestFactorySupplier; create a request factory explicitly."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#iuoxar03">
+        <description>Problem: ClientHttpRequestFactorySupplier hides request factory details and can make tuning harder.
+            Solution: create the request factory explicitly and configure the underlying HTTP client directly. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="io,jpinpoint-rule,performance,resilience" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    PostfixUnarySuffix/CallSuffix
+    and (
+        pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#<init>(*)')
+        or pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#<init>()')
+        or pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#new(*)')
+        or pmd-kotlin:matchesSig('org.springframework.boot.web.client.ClientHttpRequestFactorySupplier#new()')
+        or PrimaryExpression[SimpleIdentifier/*/@Text='ClientHttpRequestFactorySupplier']
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.boot.web.client.ClientHttpRequestFactorySupplier
+
+fun bad() {
+    val supplier = ClientHttpRequestFactorySupplier() // bad
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidDeprecatedHttpConnectors"
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
           language="kotlin"
@@ -1932,6 +1966,43 @@ class RightUseOfGuardedBy {
         <example><![CDATA[
 import org.apache.commons.httpclient.HttpClient // bad
 import org.apache.hc.client5.http.classic.HttpClient // good
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidDiscardingHttpClientConfig"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid discarding the HttpClient configuration passed to HttpComponentsClientHttpRequestFactory."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#idhc06">
+        <description>Problem: replacing a constructor supplied HttpClient discards configuration already attached to the request factory.&#13;
+            Solution: either configure the client before construction or use the no arg constructor before calling setHttpClient. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.springframework.http.client.HttpComponentsClientHttpRequestFactory#setHttpClient(*)')
+    and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = ancestor::FunctionDeclaration[1]//PropertyDeclaration[
+        Expression//PostfixUnaryExpression[
+            PrimaryExpression/SimpleIdentifier/T-Identifier/@Text = 'HttpComponentsClientHttpRequestFactory'
+            and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) > 0
+        ]
+    ]/VariableDeclaration/@Identifier
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.http.client.HttpClient
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+
+class ClientFactory {
+    fun bad(httpClient: HttpClient, newClient: HttpClient) {
+        val factory = HttpComponentsClientHttpRequestFactory(httpClient)
+        factory.setHttpClient(newClient) // bad
+    }
+}
         ]]></example>
     </rule>
 
@@ -2288,6 +2359,38 @@ class Good {
         </example>
     </rule>
 
+    <rule name="AvoidUnclearHttpRouteSecurity"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid unclear HttpRoute security configuration."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#irs04">
+        <description>Problem: HttpRoute constructors with only host or host plus local address leave secure routing intent unclear.&#13;
+            Solution: use a constructor that explicitly sets the secure flag. (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="bad-practice,jpinpoint-rule,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (
+        pmd-kotlin:matchesSig('org.apache.http.conn.routing.HttpRoute#<init>(*)')
+        or pmd-kotlin:matchesSig('org.apache.hc.client5.http.HttpRoute#<init>(*)')
+    )
+    and count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) <= 2
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.apache.http.HttpHost
+import org.apache.http.conn.routing.HttpRoute
+
+class RouteFactory {
+    fun bad(): HttpRoute = HttpRoute(HttpHost("example.com")) // bad
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidXMLGregorianCalendar"
           language="kotlin"
           message="XMLGregorianCalendar is used. It is slow in JAXB."
@@ -2325,6 +2428,38 @@ import java.time.LocalDateTime
 class Foo {
     private var cal: XMLGregorianCalendar? = null // bad
     fun good(dt: LocalDateTime): String = dt.toString() // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AxualProducerCreatedForEachMethodCall"
+          message="An Axual (Kafka) producer is created for each method call, which is expensive and takes resources."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ia10">
+        <description>Problem: each Producer takes threads and memory. If you create it in each method call, and call
+            this frequently, it can cause unnecessary resource usage and even OutOfMemoryError.&#13;
+            Solution: share Axual Producer instances as class-level properties or Spring beans. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    (: isWithin pattern :)
+    ancestor::FunctionBody
+    and not(ancestor::FunctionBody/ancestor-or-self::LambdaLiteral)
+    and pmd-kotlin:typeIs('io.axual.client.producer.Producer')
+    and not(ancestor::ClassDeclaration[pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Configuration')])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class AxualBad {
+    fun publish() {
+        val producer: Producer<String, String> = createProducer() // bad
+    }
 }
         ]]></example>
     </rule>
@@ -2426,6 +2561,53 @@ class Foo {
     fun toJson(obj: Any): String {
         return Gson().toJson(obj) // bad
     }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="HttpClientBuilderPoolSettingsIgnored"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="HttpClient builder is used with a ConnectionManager and MaxConn settings on the client are ignored. Remove them."
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ibi09">
+        <description>Problem: when setConnectionManager is used, pool settings must be configured on that connection manager.
+            Client level setMaxConnTotal and setMaxConnPerRoute calls are ignored.&#13;
+            Solution: either configure the pool sizes on the connection manager or omit setConnectionManager and configure
+            the client builder directly. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="correctness,jpinpoint-rule,resilience" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//NavigationSuffix[
+    SimpleIdentifier/*/@Text = ('setMaxConnTotal', 'setMaxConnPerRoute')
+    and ancestor::FunctionBody[1][
+        .//PostfixUnaryExpression[
+            .//NavigationSuffix[SimpleIdentifier/*/@Text = 'setConnectionManager']
+            and (
+                pmd-kotlin:matchesSig('org.apache.http.impl.client.HttpClientBuilder#setConnectionManager(*)')
+                or pmd-kotlin:matchesSig('org.apache.http.impl.client.HttpClients#setConnectionManager(*)')
+                or pmd-kotlin:matchesSig('org.apache.http.impl.nio.client.HttpAsyncClientBuilder#setConnectionManager(*)')
+                or PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = 'setConnectionManager'
+            )
+        ]
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun bad(poolMgr: PoolingHttpClientConnectionManager) {
+    HttpClientBuilder.create()
+        .setConnectionManager(poolMgr)
+        .setMaxConnTotal(200) // bad, ignored
+        .build()
+}
+
+fun good(poolMgr: PoolingHttpClientConnectionManager) {
+    HttpClientBuilder.create()
+        .setConnectionManager(poolMgr)
+        .build()
 }
         ]]></example>
     </rule>
