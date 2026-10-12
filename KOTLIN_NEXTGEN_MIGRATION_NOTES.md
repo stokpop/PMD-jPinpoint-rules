@@ -17,7 +17,7 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 
 ## Status (as of this note)
 
-27 of ~103 candidate rule changes migrated and committed, all tests green:
+32 of ~103 candidate rule changes migrated and committed, all tests green:
 
 | # | Rule | Nextgen file | Commit |
 |---|------|--------------|--------|
@@ -43,11 +43,16 @@ so the old syntactic/heuristic fallback versions are dropped; every ported rule 
 | 20 | NotProperlySynchronizingOnFieldWhileUsingGuardedBy | concurrentnextgen.xml | c68248e9 |
 | 21 | WrongUseOfGuardedBy | concurrentnextgen.xml | c68248e9 |
 | 22 | AvoidParallelFlux | concurrentnextgen.xml | c68248e9 |
-| 23 | AvoidThreadUnsafeJaxbUsage | concurrentnextgen.xml | (this commit) |
-| 24 | AvoidReactorOnEachOperator | concurrentnextgen.xml | (this commit) |
-| 25 | AvoidMDCInReactor | concurrentnextgen.xml | (this commit) |
-| 26 | AvoidNonAtomicIfModifyOnConcurrentMap | concurrentnextgen.xml | (this commit) |
-| 27 | AvoidUserDataInSharedObjects | concurrentnextgen.xml | (this commit) |
+| 23 | AvoidThreadUnsafeJaxbUsage | concurrentnextgen.xml | c5d1a8aa |
+| 24 | AvoidReactorOnEachOperator | concurrentnextgen.xml | c5d1a8aa |
+| 25 | AvoidMDCInReactor | concurrentnextgen.xml | c5d1a8aa |
+| 26 | AvoidNonAtomicIfModifyOnConcurrentMap | concurrentnextgen.xml | c5d1a8aa |
+| 27 | AvoidUserDataInSharedObjects | concurrentnextgen.xml | c5d1a8aa |
+| 28 | AvoidVolatileInPrototypeScope | concurrentnextgen.xml | (this commit) |
+| 29 | AvoidMutableCollectionInParallelStreamForEach | concurrentnextgen.xml | (this commit) |
+| 30 | AvoidXMLGregorianCalendar | remotingnextgen.xml | (this commit) |
+| 31 | AvoidObjectMapperAsField | remotingnextgen.xml | (this commit) |
+| 32 | ObjectMapperCreatedForEachMethodCall | remotingnextgen.xml | (this commit) |
 
 ## Full remaining scope
 
@@ -79,14 +84,11 @@ AvoidRecompilingPatterns, AvoidRecompilingXPathExpression, AvoidRecreatingDateTi
 AvoidSimpleDateFormat, AvoidStringBuffer, AvoidWideScopeXPathExpression, AvoidXPathAPIUsage,
 MDCPutWithoutRemove
 
-Remaining concurrent.xml rules:
-AvoidVolatileInPrototypeScope,
-AvoidMutableCollectionInParallelStreamForEach
+Remaining concurrent.xml rules: none
 (NB: `SetQueueCapacityForTaskExecutor` also appears under concurrent.xml in the source branch, but is
 a stale duplicate — resolved below, only the remoting.xml version is migrated)
 
-Remaining remoting.xml rules: AvoidXMLGregorianCalendar, AvoidObjectMapperAsField,
-ObjectMapperCreatedForEachMethodCall, GsonCreatedForEachMethodCall,
+Remaining remoting.xml rules: GsonCreatedForEachMethodCall,
 HttpClientBuilderWithoutDisableConnectionState, HttpClientBuilderWithoutTimeouts,
 AvoidDeprecatedHystrix, HttpClientBuilderWithoutPoolSize, NettyConnectionProviderWithoutMaxOrTimeout,
 BufferingClientHttpRequestFactoryIsMemoryGreedy, AvoidHttpHostOneArgumentConstructor, AvoidJAXBUtil,

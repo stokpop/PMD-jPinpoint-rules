@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: ObjectMapper as class property</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class Foo {
+    private val mapper: ObjectMapper = ObjectMapper() // bad
+    fun toJson(obj: Any): String = mapper.writeValueAsString(obj)
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: ObjectMapper as companion object property</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class Foo {
+    companion object {
+        val MAPPER: ObjectMapper = ObjectMapper() // bad - use ObjectReader/ObjectWriter instead
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: ObjectReader as class property</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectReader
+
+class Foo {
+    private val reader: ObjectReader = ObjectMapper().readerFor(Any::class.java) // good
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: ObjectWriter as class property</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectWriter
+
+class Foo {
+    private val writer: ObjectWriter = ObjectMapper().writerFor(Any::class.java) // good
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: ObjectMapper as local variable in function</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class Foo {
+    fun toJson(obj: Any): String {
+        val mapper = ObjectMapper() // local var: ObjectMapperCreatedForEachMethodCall catches this
+        return mapper.writeValueAsString(obj)
+    }
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: inferred ObjectMapper type as class property</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class Foo {
+    private val mapper = ObjectMapper() // bad - inferred type is ObjectMapper
+    fun toJson(obj: Any): String = mapper.writeValueAsString(obj)
+}
+        ]]></code>
+    </test-code>
+</test-data>

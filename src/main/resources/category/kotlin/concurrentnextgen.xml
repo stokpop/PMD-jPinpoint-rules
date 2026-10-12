@@ -1765,4 +1765,91 @@ class OrderService {
         ]]></example>
     </rule>
 
+    <rule name="AvoidVolatileInPrototypeScope"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="No need for volatile in prototype scope"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ivps01">
+        <description>A property is defined as volatile while the class has prototype scope. Problem: volatile has overhead while prototype-scoped beans are not shared.
+            Solution: remove volatile and use normal state, or an atomic type if needed. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="confusing,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    pmd-kotlin:hasAnnotation('Volatile')
+    (: hasAnnotation() only resolves on the declaration node, so check it on the class and pick the
+       @Scope Annotation node by name to read its argument :)
+    and ancestor::ClassDeclaration[
+        pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Scope')
+        and Modifiers/Annotation[.//SimpleIdentifier/*/@Text='Scope'][
+            .//T-LineStrText[@Text='prototype']
+            or .//T-Identifier[@Text='SCOPE_PROTOTYPE']
+        ]
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Component
+
+@Scope("prototype")
+@Component
+class Bad {
+    @Volatile var counter = 0 // bad
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidMutableCollectionInParallelStreamForEach"
+          message="Avoid using a mutable collection in a parallel stream forEach, it is a concurrency bug."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#imc01">
+        <description>Problem: mutating a thread-unsafe collection from a parallel stream forEach can corrupt state.
+            Solution: avoid side effects in parallel streams and collect immutable results instead. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.stream.BaseStream#forEach(*)')
+    and (
+        pmd-kotlin:matchesSig('java.util.Collection#parallelStream()')
+        or pmd-kotlin:matchesSig('java.util.stream.BaseStream#parallel()')
+    )
+    and .//LambdaLiteral//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = ('add', 'addAll', 'remove', 'removeAll', 'put', 'putAll')
+        and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+            ancestor::FunctionBody[1]//PropertyDeclaration[
+                pmd-kotlin:typeIs('java.util.ArrayList')
+                or pmd-kotlin:typeIs('java.util.HashMap')
+                or pmd-kotlin:typeIs('java.util.HashSet')
+                or pmd-kotlin:typeIs('java.util.LinkedList')
+                or pmd-kotlin:typeIs('java.util.TreeMap')
+                or pmd-kotlin:typeIs('java.util.TreeSet')
+                or pmd-kotlin:typeIs('java.util.EnumMap')
+                or pmd-kotlin:typeIs('java.util.ArrayDeque')
+                or pmd-kotlin:typeIs('java.util.PriorityQueue')
+                or pmd-kotlin:typeIs('kotlin.collections.MutableList')
+            ]/VariableDeclaration/@Identifier
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class ParallelCollector {
+    fun bad(list: List<String>) {
+        val results = ArrayList<String>()
+        list.parallelStream().forEach { results.add(it.uppercase()) } // bad
+    }
+}
+        ]]></example>
+    </rule>
+
 </ruleset>

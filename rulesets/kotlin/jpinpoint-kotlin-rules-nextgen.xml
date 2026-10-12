@@ -390,6 +390,54 @@ class Service {
         </example>
     </rule>
 
+    <rule name="AvoidMutableCollectionInParallelStreamForEach"
+          message="Avoid using a mutable collection in a parallel stream forEach, it is a concurrency bug."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#imc01">
+        <description>Problem: mutating a thread-unsafe collection from a parallel stream forEach can corrupt state.
+            Solution: avoid side effects in parallel streams and collect immutable results instead. (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.stream.BaseStream#forEach(*)')
+    and (
+        pmd-kotlin:matchesSig('java.util.Collection#parallelStream()')
+        or pmd-kotlin:matchesSig('java.util.stream.BaseStream#parallel()')
+    )
+    and .//LambdaLiteral//PostfixUnaryExpression[
+        PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*/@Text = ('add', 'addAll', 'remove', 'removeAll', 'put', 'putAll')
+        and PrimaryExpression/SimpleIdentifier/T-Identifier/@Text =
+            ancestor::FunctionBody[1]//PropertyDeclaration[
+                pmd-kotlin:typeIs('java.util.ArrayList')
+                or pmd-kotlin:typeIs('java.util.HashMap')
+                or pmd-kotlin:typeIs('java.util.HashSet')
+                or pmd-kotlin:typeIs('java.util.LinkedList')
+                or pmd-kotlin:typeIs('java.util.TreeMap')
+                or pmd-kotlin:typeIs('java.util.TreeSet')
+                or pmd-kotlin:typeIs('java.util.EnumMap')
+                or pmd-kotlin:typeIs('java.util.ArrayDeque')
+                or pmd-kotlin:typeIs('java.util.PriorityQueue')
+                or pmd-kotlin:typeIs('kotlin.collections.MutableList')
+            ]/VariableDeclaration/@Identifier
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class ParallelCollector {
+    fun bad(list: List<String>) {
+        val results = ArrayList<String>()
+        list.parallelStream().forEach { results.add(it.uppercase()) } // bad
+    }
+}
+        ]]></example>
+    </rule>
+
     <rule name="AvoidMutableStaticFields"
           message="Avoid mutable static fields. Make val (immutable) or use thread-safe access with @Volatile or @GuardedBy."
           class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
@@ -1414,6 +1462,45 @@ class OrderService {
         ]]></example>
     </rule>
 
+    <rule name="AvoidVolatileInPrototypeScope"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="No need for volatile in prototype scope"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#ivps01">
+        <description>A property is defined as volatile while the class has prototype scope. Problem: volatile has overhead while prototype-scoped beans are not shared.
+            Solution: remove volatile and use normal state, or an atomic type if needed. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="confusing,jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PropertyDeclaration[
+    pmd-kotlin:hasAnnotation('Volatile')
+    (: hasAnnotation() only resolves on the declaration node, so check it on the class and pick the
+       @Scope Annotation node by name to read its argument :)
+    and ancestor::ClassDeclaration[
+        pmd-kotlin:hasAnnotation('org.springframework.context.annotation.Scope')
+        and Modifiers/Annotation[.//SimpleIdentifier/*/@Text='Scope'][
+            .//T-LineStrText[@Text='prototype']
+            or .//T-Identifier[@Text='SCOPE_PROTOTYPE']
+        ]
+    ]
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import org.springframework.context.annotation.Scope
+import org.springframework.stereotype.Component
+
+@Scope("prototype")
+@Component
+class Bad {
+    @Volatile var counter = 0 // bad
+}
+        ]]></example>
+    </rule>
+
     <rule name="NotProperlySynchronizingOnFieldWhileUsingGuardedBy"
           language="kotlin"
           message="Not properly synchronizing access of field while using @GuardedBy(field)"
@@ -1865,6 +1952,128 @@ class RightUseOfGuardedBy {
                 ]]></value>
             </property>
         </properties>
+    </rule>
+
+    <rule name="AvoidObjectMapperAsField"
+          language="kotlin"
+          message="Avoid ObjectMapper as field, use ObjectReader or ObjectWriter instead."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#iuojar02">
+        <description>Problem: Configuring an ObjectMapper is not thread-safe.
+            Solution: Create ObjectReaders and ObjectWriters from ObjectMapper and only share those as a property,
+            since they are immutable and therefore thread-safe.
+            Exception: convertValue is not provided by ObjectReader/ObjectWriter; suppress the rule in that case.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>3</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: requires type info: kotlin-type-mapper auxClasspath :)
+//PropertyDeclaration[
+    (: isWithin pattern :)
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and (
+        pmd-kotlin:typeIs('com.fasterxml.jackson.databind.ObjectMapper')
+        or Expression//PrimaryExpression[
+            pmd-kotlin:typeIs('com.fasterxml.jackson.databind.ObjectMapper')
+        ]
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.ObjectReader
+
+class Foo {
+    private val mapper: ObjectMapper = ObjectMapper() // bad
+    private val reader: ObjectReader = ObjectMapper().readerFor(Any::class.java) // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidXMLGregorianCalendar"
+          language="kotlin"
+          message="XMLGregorianCalendar is used. It is slow in JAXB."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#iuoxar05">
+        <description>Problem: XMLGregorianCalendar is a large object involving substantial processing. It is created
+            with the poorly performing DatatypeFactory.
+            Solution: Add a converter for alternative date handling with java.time.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-medium" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: factory method call :)
+//PostfixUnaryExpression[pmd-kotlin:matchesSig('javax.xml.datatype.DatatypeFactory#newXMLGregorianCalendar(*)')]
+|
+(: property/field with XMLGregorianCalendar declared type (name-based: distinctive class name) :)
+//PropertyDeclaration[
+    (: isWithin pattern :)
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and .//T-Identifier[@Text='XMLGregorianCalendar']
+]
+|
+(: function parameter typed as XMLGregorianCalendar :)
+//FunctionValueParameter[.//T-Identifier[@Text='XMLGregorianCalendar']]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import javax.xml.datatype.XMLGregorianCalendar
+import java.time.LocalDateTime
+
+class Foo {
+    private var cal: XMLGregorianCalendar? = null // bad
+    fun good(dt: LocalDateTime): String = dt.toString() // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="ObjectMapperCreatedForEachMethodCall"
+          language="kotlin"
+          message="An ObjectMapper or JsonMapper is created for each method call, which is expensive."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="https://github.com/jborgers/PMD-jPinpoint-rules/tree/pmd7/docs/JavaCodePerformance.md#IUOJAR01">
+        <description>Problem: Jackson ObjectMapper/JsonMapper creation is expensive because it does much class loading.
+            Solution: Since ObjectMapper/JsonMapper objects are thread-safe after configuration in one thread,
+            they can be shared afterward between requests and reused. Reuse created instances from a companion object
+            or top-level val.
+            (jpinpoint-rules)
+        (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    (pmd-kotlin:matchesSig('com.fasterxml.jackson.databind.ObjectMapper#<init>(*)')
+    or pmd-kotlin:matchesSig('com.fasterxml.jackson.databind.json.JsonMapper#builder(*)')
+    or pmd-kotlin:matchesSig('com.fasterxml.jackson.databind.cfg.MapperBuilder#build()'))
+    and (: isWithin pattern :)
+    (ancestor::FunctionBody or ancestor::LambdaLiteral)
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import com.fasterxml.jackson.databind.ObjectMapper
+
+class Foo {
+    companion object {
+        private val MAPPER = ObjectMapper() // good
+    }
+    fun toJson(obj: Any): String {
+        return ObjectMapper().writeValueAsString(obj) // bad
+    }
+}
+        ]]></example>
     </rule>
 
 <!-- END Included file 'remotingnextgen.xml' -->

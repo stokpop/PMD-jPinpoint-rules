@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: XMLGregorianCalendar created via DatatypeFactory</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.datatype.DatatypeFactory
+import javax.xml.datatype.XMLGregorianCalendar
+
+class Foo {
+    fun bad(): XMLGregorianCalendar = DatatypeFactory.newInstance().newXMLGregorianCalendar() // bad
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: XMLGregorianCalendar as class property type</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.datatype.XMLGregorianCalendar
+
+class Foo {
+    private var cal: XMLGregorianCalendar? = null // bad
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: XMLGregorianCalendar as function parameter type</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import javax.xml.datatype.XMLGregorianCalendar
+
+class Foo {
+    fun bad(cal: XMLGregorianCalendar): String = cal.toString() // bad
+}
+        ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: java.time.LocalDateTime usage</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.time.LocalDateTime
+
+class Foo {
+    fun good(dt: LocalDateTime): String = dt.toString()
+}
+        ]]></code>
+    </test-code>
+</test-data>
