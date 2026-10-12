@@ -399,6 +399,8 @@ blockers — each has a reliable workaround in use today — but filing them cou
 | 8 | Ship scope helpers `pmd-kotlin:isWithin('companion-object'/'object-declaration'/'top-level'/'function-body'/'lambda')` and `pmd-kotlin:hasVariableArgument()` (is a call argument a parameter/variable rather than a literal). The source branch used both. | Both are expressible with the ancestor axis and a parameter-name comparison (see AvoidRecreatingDateTimeFormatter), but that XPath is long and easy to get wrong. | Not filed |
 | 9 | Make a missing aux-classpath jar visible: `matchesSig()`/`typeIs()` silently return false when the type is unresolved (e.g. threetenbp). An optional diagnostic or warning would help. Also `ast-dump` has no `--aux-classpath` option, so `AnnotationFqNames` is always empty there. | Missing jars looked like rule bugs (0 violations). | Not filed |
 | 10 | Upcoming upstream: pmd/pmd#7168 "[kotlin] Add @TypeName to VariableDeclaration, fix destructuring type leak" (open). Once released, `typeIs()` on `VariableDeclaration` and `@TypeName` become reliable for destructured declarations (`val (a, b) = ...`), and `PropertyDeclaration` no longer gets the first component type. | Could simplify rules that now work around variable types via `PropertyDeclaration` (e.g. AvoidTimeUnitConfusion, NonComparableMapKeys, OptimizeMapOrSetForEnum); re-check them and the destructuring tests (ImproperVariableName `_`) after upgrading PMD. | Tracking |
+| 11 | Resolve a receiver identifier to its symbol (field / parameter / local / type, and the declaring class) on `PrimaryExpression`/`SimpleIdentifier`, e.g. a `pmd-kotlin:` function or attribute. | `AvoidUnguardedMutableInheritedFieldsInSharedObjects` must infer "inherited field" by elimination (not a declared property, parameter, local or type name), because superclass members are invisible to XPath. With symbol resolution the rule could start from the fields and look for unsafe modifications, like the sibling rules for own fields. See the pitfall section below. | Not filed |
+| 12 | Make `typeIs` work on call-chain nodes (`PostfixUnaryExpression`), giving the receiver's resolved type. | Rules could ask whether the receiver is a `Collection`/`Map` instead of matching mutator names with `^(set\|put\|clear\|add\|remove\|replace)`. | Not filed |
 
 ## Useful tooling kept around for fast iteration
 
@@ -442,3 +444,10 @@ Extra pitfalls found in this batch (all fixed with plain XPath):
 - The nonexistent `isWithin('companion-object'|'top-level'|'object-declaration')` and `hasVariableArgument()`
   (AvoidRecreatingDateTimeFormatter) were replaced by ancestor axes and a parameter-name comparison.
 - Added test dep org.threeten:threetenbp 1.7.1 so matchesSig resolves the threeten DateTimeFormatter.
+- AvoidUnguardedMutableInheritedFieldsInSharedObjects: "inherited field" is inferred by elimination, since
+  superclass members are not visible to XPath. A receiver counts as a field unless it is a declared property,
+  a function parameter, a local, or a type name. Type names are recognised as a class/object declared in the
+  same file, or by convention (`^[A-Z][a-z0-9]`, so all-caps constants such as `PRINTER` still count as fields).
+  This stops `ErrorResponse.newBuilder().addStatus(..)` from being flagged. Do not restrict the mutator to the
+  first call suffix: `cache.entries.clear()` on an inherited field must still be reported (tested).
+  Better design once available: start from the fields and look for unsafe modifications; needs upstream ideas 11 and 12.
