@@ -104,4 +104,32 @@ sealed interface Shape {
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>good: class with only a companion object holding constants</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Constants {
+    companion object {
+        const val NAME = "name"
+        const val TYPE = "type"
+        val DEFAULT = 1
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: class with companion properties and a function, no instance state</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Factory {
+    companion object {
+        private val cache = HashMap<String, String>()
+        private val lock = Any()
+        fun create(): Factory = Factory()
+    }
+}
+        ]]></code>
+    </test-code>
+
 </test-data>

@@ -1357,7 +1357,7 @@ class Bad(private val id: String) {
     and not(pmd-kotlin:hasAnnotation('javax.persistence.Entity'))
     and not(.//DelegationSpecifier[pmd-kotlin:typeIs('java.lang.Throwable')])
     and (
-        count(ClassBody//PropertyDeclaration[not(ancestor::FunctionBody or ancestor::LambdaLiteral)])
+        count(ClassBody/ClassMemberDeclarations/ClassMemberDeclaration/Declaration/PropertyDeclaration) (: own instance properties only, not those of a companion or nested object/class :)
         + count(PrimaryConstructor//ClassParameter[@Identifier])
     ) >= 2
     and not(ClassBody//FunctionDeclaration[@Identifier='equals' and count(FunctionValueParameters//FunctionValueParameter) = 1])
