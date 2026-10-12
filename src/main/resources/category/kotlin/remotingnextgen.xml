@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="jpinpoint-nextgen-rules" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0">
+    <description>jPinpoint "nextgen" rule set: new Kotlin remoting rules using PMD 7.28.0 type-resolution XPath
+        functions (pmd-kotlin:typeIs, pmd-kotlin:matchesSig). These rules REQUIRE a PMD version that supports those
+        features and therefore are NOT included in the standard jpinpoint-kotlin-rules.xml, to keep that file working
+        on older PMD versions. See the "Nextgen rules" section in the README for details. (jpinpoint-rules)
+    </description>
+
+    <rule name="AvoidExcessiveClassloadingWithSaajSoap"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          message="Avoid excessive class loading with SAAJ SOAP messaging, use alternative Axiom, or system properties."
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ibi23">
+        <description>Problem: SAAJ uses DOM to load the XML document in memory, which uses a TransformerFactory. The
+            implementation class of it is loaded on every call that causes lock contention under load. This means long
+            response times.
+            Solution: If possible, use Axiom SOAP messaging which uses the faster StAX. If you have/want to stick to
+            SAAJ, set the proper system properties to prevent the excessive class loading.
+            Note: Axiom (2.0) is available again in Spring web services, since version 4.1.
+            (jpinpoint-rules)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,performance,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+(: Constructor call to SaajSoapMessageFactory without TransformerFactory system property fix :)
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('org.springframework.ws.soap.saaj.SaajSoapMessageFactory#<init>(*)')
+    and not(ancestor::ClassBody//PostfixUnaryExpression[
+        PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='System']
+        and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='setProperty']
+        and .//T-LineStrText[@Text='javax.xml.transform.TransformerFactory']
+    ])
+]
+,
+(: Class-level property with explicit SaajSoapMessageFactory type (no constructor call, that is caught above).
+   (: isWithin pattern :) pmd-kotlin:isWithin('function-body'/'lambda') does not exist in released PMD (7.28.0) -
+   it is from a proposed/experimental future API. Replaced here with a plain ancestor:: check instead, since
+   PropertyDeclaration is used for class-level properties, local variables and lambda-local variables alike;
+   only the ancestor axis distinguishes a class-level declaration from a local one. If/when isWithin() is
+   actually released, search for "(: isWithin pattern :)" to find and simplify all occurrences of this idiom. :)
+//PropertyDeclaration[
+    not(ancestor::FunctionBody or ancestor::LambdaLiteral)
+    and pmd-kotlin:typeIs('org.springframework.ws.soap.saaj.SaajSoapMessageFactory')
+    and not(.//PostfixUnaryExpression[pmd-kotlin:matchesSig('org.springframework.ws.soap.saaj.SaajSoapMessageFactory#<init>(*)')])
+    and not(ancestor::ClassBody//PostfixUnaryExpression[
+        PrimaryExpression/SimpleIdentifier/T-Identifier[@Text='System']
+        and PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='setProperty']
+        and .//T-LineStrText[@Text='javax.xml.transform.TransformerFactory']
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+    </rule>
+
+</ruleset>
