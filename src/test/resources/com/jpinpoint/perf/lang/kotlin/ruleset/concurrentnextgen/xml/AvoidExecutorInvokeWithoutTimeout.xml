@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: invokeAll without timeout</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
+
+class TaskRunner {
+    fun invokeAllBad(executor: ExecutorService, callables: Collection<Callable<String>>): List<Future<String>> {
+        return executor.invokeAll(callables)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: invokeAny without timeout</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+
+class AnyRunner {
+    fun invokeAnyBad(executor: ExecutorService, callables: Collection<Callable<String>>): String {
+        return executor.invokeAny(callables)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: invokeAll with timeout</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+
+class TimedTaskRunner {
+    fun invokeAllGood(executor: ExecutorService, callables: Collection<Callable<String>>): List<Future<String>> {
+        return executor.invokeAll(callables, 30, TimeUnit.SECONDS)
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: invokeAny with timeout</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.TimeUnit
+
+class TimedAnyRunner {
+    fun invokeAnyGood(executor: ExecutorService, callables: Collection<Callable<String>>): String {
+        return executor.invokeAny(callables, 10, TimeUnit.SECONDS)
+    }
+}
+        ]]></code>
+    </test-code>
+
+</test-data>

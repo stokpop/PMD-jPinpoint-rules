@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data
+        xmlns="http://pmd.sourceforge.net/rule-tests"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+    <test-code>
+        <description>violation: Avoid Future Get Without Timeout</description>
+        <expected-problems>6</expected-problems>
+        <expected-linenumbers>15, 16, 17, 18, 19, 20</expected-linenumbers>
+        <code><![CDATA[
+import java.util.concurrent.*
+
+class AvoidFutureGetWithoutTimeout<T> {
+    private val futureField1: Future<List<T>>? = null
+    private val futureField2: Future<List<T>>? = null
+
+    fun bad(
+        complFutureParam: CompletableFuture<List<Any>>,
+        col: MutableList<Any>,
+        complService: CompletionService<List<Any>>
+    ) {
+        val futureLocal1 = complService.take()
+        val futureLocal2 = complService.take()
+        val runFutLocal: RunnableFuture<List<Any>> = FutureTask { emptyList<Any>() }
+        col.addAll(complFutureParam.get()) // bad
+        col.addAll(futureLocal1.get()) // bad
+        col.addAll(futureLocal2.get()) // bad
+        col.addAll(runFutLocal.get()) // bad
+        col.addAll(futureField1!!.get()) // bad
+        col.addAll(futureField2!!.get()) // bad
+    }
+
+    fun good(
+        complFutureParam: CompletableFuture<List<Any>>,
+        col: MutableList<Any>,
+        complService: CompletionService<List<Any>>
+    ) {
+        val timeout = 10L
+        val futureLocal1 = complService.take()
+        val futureLocal2 = complService.take()
+        val runFutLocal: RunnableFuture<List<Any>> = FutureTask { emptyList<Any>() }
+        col.addAll(complFutureParam.get(10, TimeUnit.SECONDS)) // good
+        col.addAll(futureLocal1.get(timeout, TimeUnit.SECONDS)) // good
+        col.addAll(runFutLocal.get(timeout, TimeUnit.SECONDS)) // good
+        col.addAll(futureField1!!.get(timeout, TimeUnit.SECONDS)) // good
+        col.addAll(futureField2!!.get(timeout, TimeUnit.SECONDS)) // good
+    }
+}
+]]></code>
+    </test-code>
+
+</test-data>

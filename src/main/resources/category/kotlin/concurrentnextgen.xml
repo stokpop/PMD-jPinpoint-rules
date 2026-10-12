@@ -60,4 +60,187 @@ class SyncService {
         ]]></example>
     </rule>
 
+    <rule name="AvoidCompletionServiceTake"
+          language="kotlin"
+          message="Avoid completionService.take, use poll"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md">
+        <description>
+            Problem: take() stalls indefinitely in case of hanging threads and consumes a thread.&#13;
+            Solution: use poll() with a timeout value and handle the timeout.
+            (jpinpoint-rules)
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.concurrent.CompletionService#take()')
+    and ./PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text='take']
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun collectBad(completionService: CompletionService<List<Any>>): Future<List<Any>> {
+    return completionService.take() // bad
+}
+
+fun collectGood(completionService: CompletionService<List<Any>>): Future<List<Any>>? {
+    return completionService.poll(3L, TimeUnit.SECONDS) // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidFutureGetWithoutTimeout"
+          language="kotlin"
+          message="Avoid future.get without timeout"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ia06">
+        <description>
+            Problem: Stalls indefinitely in case of hanging threads and consumes a thread.&#13;
+            Solution: Provide a timeout value and handle the timeout.
+            (jpinpoint-rules)
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.concurrent.Future#get()')
+    (: 'get' is a Kotlin soft keyword (property getter), tokenized as T-GET not T-Identifier; use a wildcard :)
+    and ./PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/*[@Text='get']
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+fun bad(complFuture: CompletableFuture<String>): String {
+    return complFuture.get() // bad
+}
+
+fun good(complFuture: CompletableFuture<String>): String {
+    return complFuture.get(10, TimeUnit.SECONDS) // good
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidCommonPoolForBlockingCalls"
+          message="Avoid parallelStream() for blocking (remote) calls; it uses the ForkJoinPool common pool which can starve other tasks."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="kotlin"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#cac10">
+        <description>Problem: parallelStream() uses the ForkJoinPool common pool (shared JVM-wide). Blocking calls (HTTP, DB) starve it.
+            Solution: Use a dedicated ForkJoinPool (submit your parallel work to it), or use Kotlin coroutines with IO dispatcher.
+            (jpinpoint-rules)</description>
+        <priority>1</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,sustainability-high" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//KotlinFile[
+    ImportList/ImportHeader[
+        starts-with(@Name, 'org.springframework.web.client')
+        or starts-with(@Name, 'org.apache.commons.httpclient')
+        or starts-with(@Name, 'org.apache.http')
+    ]
+]//PostfixUnaryExpression[
+    pmd-kotlin:matchesSig('java.util.Collection#parallelStream()')
+    and not(ancestor::LambdaLiteral[
+        ancestor::PostfixUnaryExpression[pmd-kotlin:matchesSig('java.util.concurrent.ForkJoinPool#submit(*)')]
+    ])
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import org.springframework.web.client.RestTemplate
+class Service(val restTemplate: RestTemplate) {
+    val items = listOf("a", "b")
+    fun bad() = items.parallelStream().forEach { restTemplate.getForObject("/api/$it", String::class.java) } // bad: blocks common pool
+    fun good() = kotlinx.coroutines.runBlocking { items.map { kotlinx.coroutines.async(kotlinx.coroutines.Dispatchers.IO) { restTemplate.getForObject("/api/$it", String::class.java) } }.map { it.await() } } // ok: IO dispatcher
+}
+        ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidExecutorInvokeWithoutTimeout"
+          language="kotlin"
+          message="Avoid using ExecutorService::invokeAll or invokeAny without a timeout."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ia15">
+        <description>Problem: Stalls indefinitely in case of stalled Callable(s) and consumes threads.
+            Solution: Provide a timeout to the invokeAll/invokeAny method and handle the timeout. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) = 1
+    and (
+        pmd-kotlin:matchesSig('java.util.concurrent.ExecutorService#invokeAll(*)')
+        or pmd-kotlin:matchesSig('java.util.concurrent.ExecutorService#invokeAny(*)')
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+
+class TaskRunner {
+    fun invokeAllBad(executor: ExecutorService, callables: Collection<Callable<String>>): List<Future<String>> {
+        return executor.invokeAll(callables) // bad
+    }
+
+    fun invokeAllGood(executor: ExecutorService, callables: Collection<Callable<String>>): List<Future<String>> {
+        return executor.invokeAll(callables, 30, TimeUnit.SECONDS) // good
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidParallelStreamWithCommonPool"
+          language="kotlin"
+          message="Beware: parallelStream with the common pool is rarely a good choice."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${doc_root}/JavaCodePerformance.md#ia11">
+        <description>Problem: Collection.parallelStream uses the common pool, with #threads = #CPUs. It is designed to distribute much CPU work over the cores. It is not designed for remote calls or other blocking calls.
+            In addition, parallelizing has CPU overhead and concurrency risks.
+            Solution: Prefer sequential streams or Kotlin sequences, or use a dedicated pool when parallelism is justified. (jpinpoint-rules)</description>
+        <priority>2</priority>
+        <properties>
+            <property name="tags" value="cpu,jpinpoint-rule,multi-threading,performance,sustainability-medium,unpredictable" type="String" description="classification"/>
+            <property name="xpath">
+                <value><![CDATA[
+//PostfixUnaryExpression[
+    count(PostfixUnarySuffix/CallSuffix/ValueArguments/ValueArgument) = 0
+    and (
+        pmd-kotlin:matchesSig('java.util.Collection#parallelStream(*)')
+        or pmd-kotlin:matchesSig('java.util.stream.BaseStream#parallel(*)')
+    )
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example><![CDATA[
+class StreamService {
+    fun bad(list: List<String>) {
+        list.parallelStream().forEach { println(it) } // bad
+    }
+
+    fun good(list: List<String>) {
+        list.asSequence().forEach { println(it) } // good
+    }
+}
+        ]]></example>
+    </rule>
+
 </ruleset>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<test-data xmlns="http://pmd.sourceforge.net/rule-tests"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="http://pmd.sourceforge.net/rule-tests http://pmd.sourceforge.net/rule-tests_1_0_0.xsd">
+
+    <test-code>
+        <description>bad: parallelStream with spring web client import (blocking calls)</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>7</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.web.client.RestTemplate
+
+class Service(private val restTemplate: RestTemplate) {
+    private val items = listOf("a", "b", "c")
+
+    fun fetchAll() {
+        items.parallelStream().forEach { item -> restTemplate.getForObject("/api/$item", String::class.java) } // bad: blocks common pool
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: parallelStream with apache http client import</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>6</expected-linenumbers>
+        <code><![CDATA[
+import org.apache.commons.httpclient.HttpClient
+
+class Service {
+    private val items = listOf("a", "b", "c")
+    fun fetchAll(client: HttpClient) {
+        items.parallelStream().forEach { client.executeMethod(null) } // bad: blocking in common pool
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: parallelStream without blocking HTTP client imports</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Service {
+    private val items = listOf(1, 2, 3, 4)
+    fun compute() = items.parallelStream().mapToInt { it * 2 }.sum() // ok: CPU-only, no blocking
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: explicit ForkJoinPool for blocking parallel work (idiomatic)</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.web.client.RestTemplate
+import java.util.concurrent.ForkJoinPool
+
+class Service(private val restTemplate: RestTemplate) {
+    private val pool = ForkJoinPool(10)
+    private val items = listOf("a", "b")
+    fun fetchAll() = pool.submit {
+        items.parallelStream().forEach { restTemplate.getForObject("/api/$it", String::class.java) } // ok: custom pool
+    }.get()
+}
+        ]]></code>
+    </test-code>
+
+</test-data>
