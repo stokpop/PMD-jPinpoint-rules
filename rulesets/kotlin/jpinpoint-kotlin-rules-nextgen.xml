@@ -3186,11 +3186,9 @@ class Good {
     (pmd-kotlin:hasAnnotation('org.springframework.boot.context.properties.ConfigurationProperties'))
     and not(pmd-kotlin:hasAnnotation('lombok.Setter'))
   )
-]//PropertyDeclaration[
-  (: isWithin pattern :)
-  not(ancestor::FunctionBody)
-  and not(ancestor::ClassDeclaration[ancestor::ClassBody])
-  and (
+]//PropertyDeclaration[not(ancestor::FunctionBody)][not(ancestor::ClassDeclaration[ancestor::ClassBody])][
+  (: separate predicates: the field-only guards above must apply to Case 1 and Case 2 alike :)
+  (
     (: Case 1: var field that is not volatile and not guarded :)
     @Mutable = true()
     and not(pmd-kotlin:modifiers()='volatile')

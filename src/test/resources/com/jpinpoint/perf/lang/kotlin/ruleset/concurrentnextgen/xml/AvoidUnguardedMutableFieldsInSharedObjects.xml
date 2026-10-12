@@ -220,4 +220,20 @@ class PostConstructService {
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>good: local variable of a mutable type in a method of a singleton is not a field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.stereotype.Component
+
+@Component
+class Demo {
+    fun parse(s: Any): Any {
+        val map = s as java.util.HashMap<String, String>
+        return map
+    }
+}
+        ]]></code>
+    </test-code>
+
 </test-data>
