@@ -390,6 +390,13 @@ local variables because `not(ancestor::FunctionBody)` only guarded the `var` bra
 `//PropertyDeclaration[not(ancestor::FunctionBody)][not(...)][ (case1) or (case2) ]`. When porting a rule with an
 `or` of cases, always test each case with a local variable and a nested-class property.
 
+### Pitfall: `PostfixUnaryOperator` is not only `++`/`--`
+
+`PostfixUnaryOperator` also holds the not-null assertion `x!!` (`T-EXCL_EXCL`), so `PostfixUnarySuffix[PostfixUnaryOperator]`
+matches `cached!!` (false positive in `AvoidIncrementOrDecrementForVolatileField`). Test `PostfixUnaryOperator[T-INCR or T-DECR]`.
+Prefix forms are separate nodes: `PrefixUnaryExpression/UnaryPrefix/PrefixUnaryOperator[T-INCR or T-DECR]` with the operand in
+`PostfixUnaryExpression/PrimaryExpression`; a rule that only looks at `PostfixUnaryExpression` misses `--x` and `++x`.
+
 ## Upstream PMD improvement ideas (tracked, not yet filed)
 
 Ideas worth proposing to the `pmd/pmd` project, discovered while doing this migration. None are

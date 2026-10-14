@@ -2284,9 +2284,18 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
             <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
             <property name="xpath">
                 <value><![CDATA[
+(: postfix x++ / x--; PostfixUnaryOperator also covers the not-null assertion x!!, so test for T-INCR/T-DECR :)
 //PostfixUnaryExpression[
-    PostfixUnarySuffix[PostfixUnaryOperator]
+    PostfixUnarySuffix/PostfixUnaryOperator[T-INCR or T-DECR]
     and PrimaryExpression/SimpleIdentifier/*/@Text = ancestor::ClassBody[1]//PropertyDeclaration[
+            pmd-kotlin:hasAnnotation('Volatile')
+        ]/VariableDeclaration/@Identifier
+]
+|
+(: prefix ++x / --x :)
+//PrefixUnaryExpression[
+    UnaryPrefix/PrefixUnaryOperator[T-INCR or T-DECR]
+    and PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/*/@Text = ancestor::ClassBody[1]//PropertyDeclaration[
             pmd-kotlin:hasAnnotation('Volatile')
         ]/VariableDeclaration/@Identifier
 ]

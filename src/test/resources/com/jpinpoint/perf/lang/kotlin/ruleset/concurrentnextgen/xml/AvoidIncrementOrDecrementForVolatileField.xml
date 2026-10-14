@@ -82,4 +82,38 @@ class FlagHolder {
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>good: not-null assertion (!!) on a volatile field is not an increment</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Holder {
+    @Volatile
+    private var cached: String? = null
+
+    fun get(): String {
+        return cached!!
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: prefix decrement and increment of a volatile field</description>
+        <expected-problems>2</expected-problems>
+        <code><![CDATA[
+class Counter {
+    @Volatile
+    private var count = 0
+
+    fun dec() {
+        --count
+    }
+
+    fun inc() {
+        ++count
+    }
+}
+        ]]></code>
+    </test-code>
+
 </test-data>
