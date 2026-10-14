@@ -381,6 +381,15 @@ ignore/drop the concurrent.xml duplicate.**
       specifically targets the excluded scenario. Worth deliberately adding a test case for every
       `not(@Text = ...)`-style exclusion clause, not just for the main positive/negative cases.
 
+### Pitfall: guards before a top-level `or` only cover its first branch
+
+`//X[ not(guard1) and not(guard2) and ( case1 ) or ( case2 ) ]` parses as `(guard1 and guard2 and case1) or case2`,
+so `case2` ignores the guards. Found in `AvoidUnguardedMutableFieldsInSharedObjects` and
+`AvoidUnguardedMutableFieldsInObjectsUsingSynchronized`: the mutable-type branch (`typeIs('java.util.Date')`, ...) fired on
+local variables because `not(ancestor::FunctionBody)` only guarded the `var` branch. Put guards in their own predicates:
+`//PropertyDeclaration[not(ancestor::FunctionBody)][not(...)][ (case1) or (case2) ]`. When porting a rule with an
+`or` of cases, always test each case with a local variable and a nested-class property.
+
 ## Upstream PMD improvement ideas (tracked, not yet filed)
 
 Ideas worth proposing to the `pmd/pmd` project, discovered while doing this migration. None are
