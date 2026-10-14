@@ -64,6 +64,7 @@ public class RulesetMerger {
     // the regular merged ruleset (so that one keeps working on older PMD versions), and instead published as a
     // separate "-nextgen" overlay ruleset that references the regular one and overrides just those rules.
     private static final String NEXTGEN_MARKER = "nextgen";
+    private static final String PREVIEW_MARKER = "pmdpreview";
     private static final String NEXTGEN_OUTPUT_SUFFIX = "-nextgen";
     private static final String NEXTGEN_RULE_SET_LINE_TEMPLATE = "<ruleset name=\"%s\" %n" +
             "         xmlns=\"http://pmd.sourceforge.net/ruleset/2.0.0\" %n"  +
@@ -166,8 +167,9 @@ public class RulesetMerger {
         checkIfValid(ourProjectRulesDir, allRulesFiles, outputDir, resultFile);
 
         // "nextgen" files are excluded from the regular merge, they get their own overlay ruleset (see below)
+        // "pmdpreview" files (temporary preview of PMD's own rules) are used as is: neither merged nor overlaid
         String[] ourRulesFiles = Arrays.stream(allRulesFiles)
-                .filter(name -> !isNextgenFileName(name))
+                .filter(name -> !isNextgenFileName(name) && !isPreviewFileName(name))
                 .toArray(String[]::new);
         String[] nextgenRulesFiles = Arrays.stream(allRulesFiles)
                 .filter(RulesetMerger::isNextgenFileName)
@@ -220,6 +222,10 @@ public class RulesetMerger {
             Arrays.sort(nextgenRulesFiles);
             mergeNextgenOverlay(ourProjectRulesDir, ourRulesFiles, nextgenRulesFiles, outputDir, resultFile.getName(), resultRulesName, language);
         }
+    }
+
+    private static boolean isPreviewFileName(String fileName) {
+        return fileName.toLowerCase(Locale.ROOT).contains(PREVIEW_MARKER);
     }
 
     private static boolean isNextgenFileName(String fileName) {
