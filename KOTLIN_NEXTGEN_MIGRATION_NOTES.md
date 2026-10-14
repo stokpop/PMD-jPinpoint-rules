@@ -402,6 +402,20 @@ blockers — each has a reliable workaround in use today — but filing them cou
 | 11 | Resolve a receiver identifier to its symbol (field / parameter / local / type, and the declaring class) on `PrimaryExpression`/`SimpleIdentifier`, e.g. a `pmd-kotlin:` function or attribute. | `AvoidUnguardedMutableInheritedFieldsInSharedObjects` must infer "inherited field" by elimination (not a declared property, parameter, local or type name), because superclass members are invisible to XPath. With symbol resolution the rule could start from the fields and look for unsafe modifications, like the sibling rules for own fields. See the pitfall section below. | Not filed |
 | 12 | Make `typeIs` work on call-chain nodes (`PostfixUnaryExpression`), giving the receiver's resolved type. | Rules could ask whether the receiver is a `Collection`/`Map` instead of matching mutator names with `^(set\|put\|clear\|add\|remove\|replace)`. | Not filed |
 
+## PMD Kotlin rules preview (temporary, branch `kotlin-pmd-preview` only)
+
+`src/main/resources/category/kotlin/pmdpreview.xml` holds PMD's own Kotlin XPath rules from
+`stokpop/pmd@feature/kotlin-type-mapper`, so they can be tried on stock PMD 7.28.0. Use the file directly (not generated).
+- The merger skips "pmdpreview" files, so they never end up in `jpinpoint-kotlin-rules*.xml`.
+- Tests: `src/test/.../ruleset/pmdpreview/` (test XMLs copied from the fork), counted in the Kotlin suite.
+- 33 rules included. Left out: 6 Java-class rules (need the fork's jar), 12 rules using the fork-only functions
+  `pmd-kotlin:nodeText()` / `pmd-kotlin:insideLoop()`, and 7 rules whose tests fail on stock 7.28.0 because they use
+  fork-only AST attributes (`@Identifier` on CatchBlock/PrimaryExpression, upstream idea 1) or signatures not resolved
+  there (listed in the file's description).
+- The 12 could be rewritten with plain XPath: `insideLoop()` = `ancestor::*[self::ForStatement or self::WhileStatement or self::DoWhileStatement]`,
+  `nodeText()` = `string-join(descendant-or-self::*/@Text, '')` or token tests like `T-TRUE`.
+- Delete the preview files before merging this branch into the nextgen branch, or once PMD ships these rules.
+
 ## Useful tooling kept around for fast iteration
 
 - Real PMD CLI binaries: `/tmp/pmd-bin-7.28.0` and `/tmp/pmd-bin-7.16.0` (the latter useful to confirm
