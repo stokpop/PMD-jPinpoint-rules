@@ -422,6 +422,55 @@ blockers — each has a reliable workaround in use today — but filing them cou
 | 11 | Resolve a receiver identifier to its symbol (field / parameter / local / type, and the declaring class) on `PrimaryExpression`/`SimpleIdentifier`, e.g. a `pmd-kotlin:` function or attribute. | `AvoidUnguardedMutableInheritedFieldsInSharedObjects` must infer "inherited field" by elimination (not a declared property, parameter, local or type name), because superclass members are invisible to XPath. With symbol resolution the rule could start from the fields and look for unsafe modifications, like the sibling rules for own fields. See the pitfall section below. | Not filed |
 | 12 | Make `typeIs` work on call-chain nodes (`PostfixUnaryExpression`), giving the receiver's resolved type. | Rules could ask whether the receiver is a `Collection`/`Map` instead of matching mutator names with `^(set\|put\|clear\|add\|remove\|replace)`. | Not filed |
 
+## Ideas for reusable XPath functions (pmd-kotlin / pmd-java)
+
+Patterns we had to copy into many rules (the `*nextgen.xml` files); each would become one short, tested, upstream function.
+Quoted lines are from `concurrentnextgen.xml`.
+
+1. **Shared-bean test** (copied into ~10 concurrency rules): `pmd-kotlin:isSharedBean()`, true for a singleton-like Spring class.
+   ```xpath
+   pmd-kotlin:hasAnnotation('org.springframework.stereotype.Service')
+   or pmd-kotlin:hasAnnotation('org.springframework.stereotype.Component')
+   ... and not(pmd-kotlin:hasAnnotation('org.springframework.web.context.annotation.RequestScope'))
+   and not(pmd-kotlin:hasAnnotation('NotThreadSafe'))
+   ```
+2. **Name resolution of a reference** (also upstream idea 11): `pmd-kotlin:isLocal(.)` / `isField(.)` / `declaringClass(.)`. Today every rule
+   rebuilds locals and fields by name and gets shadowing and `this.x` wrong:
+   ```xpath
+   $fields := ancestor::ClassBody/ClassMemberDeclarations/ClassMemberDeclaration/Declaration/PropertyDeclaration[pmd-kotlin:hasAnnotation('Volatile')]/VariableDeclaration/@Identifier,
+   $locals := (ancestor::FunctionBody[1]//VariableDeclaration/@Identifier,
+               ancestor::FunctionDeclaration[1]//FunctionValueParameter/Parameter/SimpleIdentifier/*/@Text)
+   ```
+3. **Assignment/increment target normalisation:** `pmd-kotlin:assignedNames()` returning the written member for `x = v`, `this.x = v`, `x += v`, `x++`, `++x`,
+   and nothing for `obj.x = v`. We needed three shapes (`DirectlyAssignableExpression`, `AssignableExpression`, `PrefixUnaryExpression/PostfixUnaryExpression`):
+   ```xpath
+   $plain   := ($target/SimpleIdentifier/*/@Text, $target//PostfixUnaryExpression[not(PostfixUnarySuffix)]/PrimaryExpression/SimpleIdentifier/*/@Text, ...),
+   $viaThis := ($target//PostfixUnaryExpression[PrimaryExpression/ThisExpression]/PostfixUnarySuffix[1]/NavigationSuffix/SimpleIdentifier/*/@Text, ...)
+   ```
+4. **Increment/decrement test:** `pmd-kotlin:isIncrementOrDecrement()`; `PostfixUnaryOperator` also holds `!!`, and prefix forms are other nodes:
+   ```xpath
+   PostfixUnarySuffix/PostfixUnaryOperator[T-INCR or T-DECR]
+   UnaryPrefix/PrefixUnaryOperator[T-INCR or T-DECR]
+   ```
+5. **Guarded by lock:** `pmd-kotlin:isSynchronized()` for `@Synchronized` functions and `synchronized(lock) { }` blocks:
+   ```xpath
+   not(ancestor::FunctionDeclaration[pmd-kotlin:hasAnnotation('Synchronized')])
+   and not(ancestor::PostfixUnaryExpression[pmd-kotlin:matchesSig('kotlin#synchronized(_,_)')])
+   ```
+6. **Framework-initialised code:** `pmd-kotlin:isInitFunction()` for `@Autowired`/`@Inject`/`@PostConstruct`/`@BeforeStep`/`@Value` and `afterPropertiesSet`, repeated in four rules:
+   ```xpath
+   ancestor::FunctionDeclaration[pmd-kotlin:hasAnnotation('Autowired') or pmd-kotlin:hasAnnotation('PostConstruct') or pmd-kotlin:hasAnnotation('Inject') ...]
+   ```
+7. **Class-level versus function-level property:** `pmd-kotlin:isMember()`; we repeat the `(: isWithin pattern :)` guards (`not(ancestor::FunctionBody)`, `not(ancestor::ClassDeclaration[ancestor::ClassBody])`).
+   Putting them in the same predicate as an `or` of cases was a real bug (see pitfalls), a function would remove that trap.
+8. **Type-name receiver** (`ErrorResponse.newBuilder().addStatus()`): `pmd-kotlin:isTypeReference(.)`; we only have a name heuristic:
+   ```xpath
+   not(matches(@Text, '^[A-Z][a-z0-9]') or @Text = ancestor::KotlinFile//(ClassDeclaration|ObjectDeclaration)/@Identifier)
+   ```
+9. **Mutable type:** `pmd-kotlin:isMutableType()` instead of the list `typeIs('java.util.Date') or typeIs('java.lang.StringBuilder') or ...` copied into several rules.
+10. **Java side:** the same helpers (shared bean, synchronized, init method, mutator-name test `matches(@Text, '^(set|put|clear|add|remove|replace)')`) exist as copy/paste in `category/java/concurrent.xml`,
+    so they could be one set of functions for both languages.
+
 ## Useful tooling kept around for fast iteration
 
 - Real PMD CLI binaries: `/tmp/pmd-bin-7.28.0` and `/tmp/pmd-bin-7.16.0` (the latter useful to confirm
