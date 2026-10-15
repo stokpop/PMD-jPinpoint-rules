@@ -2284,27 +2284,66 @@ fun getOrdersGood(futures: List<CompletableFuture<Order>>): List<Order> {
             <property name="tags" value="jpinpoint-rule,multi-threading,performance,pitfall" type="String" description="classification"/>
             <property name="xpath">
                 <value><![CDATA[
+(: Volatile fields of this class or of an enclosing class (member properties only, not locals of nested scopes).
+   A plain name that is also declared as a local, loop variable, lambda parameter or function parameter in the
+   enclosing function is that local, not the field (this.x always is the field). :)
 (: postfix x++ / x--; PostfixUnaryOperator also covers the not-null assertion x!!, so test for T-INCR/T-DECR :)
 //PostfixUnaryExpression[
-    PostfixUnarySuffix/PostfixUnaryOperator[T-INCR or T-DECR]
-    and PrimaryExpression/SimpleIdentifier/*/@Text = ancestor::ClassBody[1]//PropertyDeclaration[
+    let $fields := ancestor::ClassBody/ClassMemberDeclarations/ClassMemberDeclaration/Declaration/PropertyDeclaration[
             pmd-kotlin:hasAnnotation('Volatile')
-        ]/VariableDeclaration/@Identifier
+        ]/VariableDeclaration/@Identifier,
+        $locals := (ancestor::FunctionBody[1]//VariableDeclaration/@Identifier,
+                    ancestor::FunctionDeclaration[1]//FunctionValueParameter/Parameter/SimpleIdentifier/*/@Text)
+    return (
+        PostfixUnarySuffix/PostfixUnaryOperator[T-INCR or T-DECR]
+        and (
+            (: plain x++ :)
+            (not(PostfixUnarySuffix/NavigationSuffix)
+                and PrimaryExpression/SimpleIdentifier/*/@Text = $fields
+                and not(PrimaryExpression/SimpleIdentifier/*/@Text = $locals))
+            (: this.x++ :)
+            or (PrimaryExpression/ThisExpression
+                and PostfixUnarySuffix[1]/NavigationSuffix/SimpleIdentifier/*/@Text = $fields)
+        )
+    )
 ]
 |
 (: prefix ++x / --x :)
 //PrefixUnaryExpression[
-    UnaryPrefix/PrefixUnaryOperator[T-INCR or T-DECR]
-    and PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/*/@Text = ancestor::ClassBody[1]//PropertyDeclaration[
+    let $fields := ancestor::ClassBody/ClassMemberDeclarations/ClassMemberDeclaration/Declaration/PropertyDeclaration[
             pmd-kotlin:hasAnnotation('Volatile')
-        ]/VariableDeclaration/@Identifier
+        ]/VariableDeclaration/@Identifier,
+        $locals := (ancestor::FunctionBody[1]//VariableDeclaration/@Identifier,
+                    ancestor::FunctionDeclaration[1]//FunctionValueParameter/Parameter/SimpleIdentifier/*/@Text)
+    return (
+        UnaryPrefix/PrefixUnaryOperator[T-INCR or T-DECR]
+        and PostfixUnaryExpression[
+            (not(PostfixUnarySuffix/NavigationSuffix)
+                and PrimaryExpression/SimpleIdentifier/*/@Text = $fields
+                and not(PrimaryExpression/SimpleIdentifier/*/@Text = $locals))
+            or (PrimaryExpression/ThisExpression
+                and PostfixUnarySuffix[1]/NavigationSuffix/SimpleIdentifier/*/@Text = $fields)
+        ]
+    )
 ]
 |
+(: compound assignment x += 1, this.x += 1 :)
 //Assignment[
-    AssignmentAndOperator
-    and (DirectlyAssignableExpression|AssignableExpression)//SimpleIdentifier/*/@Text = ancestor::ClassBody[1]//PropertyDeclaration[
+    let $fields := ancestor::ClassBody/ClassMemberDeclarations/ClassMemberDeclaration/Declaration/PropertyDeclaration[
             pmd-kotlin:hasAnnotation('Volatile')
-        ]/VariableDeclaration/@Identifier
+        ]/VariableDeclaration/@Identifier,
+        $locals := (ancestor::FunctionBody[1]//VariableDeclaration/@Identifier,
+                    ancestor::FunctionDeclaration[1]//FunctionValueParameter/Parameter/SimpleIdentifier/*/@Text),
+        $target := (DirectlyAssignableExpression|AssignableExpression)[1],
+        $plain := ($target/SimpleIdentifier/*/@Text,
+                   $target//PostfixUnaryExpression[not(PostfixUnarySuffix)]/PrimaryExpression/SimpleIdentifier/*/@Text,
+                   $target[not(AssignableSuffix)]/PostfixUnaryExpression/PrimaryExpression/SimpleIdentifier/*/@Text),
+        $viaThis := ($target//PostfixUnaryExpression[PrimaryExpression/ThisExpression]/PostfixUnarySuffix[1]/NavigationSuffix/SimpleIdentifier/*/@Text,
+                     $target[PostfixUnaryExpression/PrimaryExpression/ThisExpression]/AssignableSuffix[1]/NavigationSuffix/SimpleIdentifier/*/@Text)
+    return (
+        AssignmentAndOperator
+        and (($plain = $fields and not($plain = $locals)) or $viaThis = $fields)
+    )
 ]
                 ]]></value>
             </property>

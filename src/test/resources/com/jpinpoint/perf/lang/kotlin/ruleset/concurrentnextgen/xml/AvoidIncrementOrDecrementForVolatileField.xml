@@ -116,4 +116,137 @@ class Counter {
         ]]></code>
     </test-code>
 
+    <test-code>
+        <description>good: local variable shadows the volatile field name</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class A {
+    @Volatile
+    private var count = 0
+
+    fun f() {
+        var count = 0
+        count++
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: parameter-like local loop counter with the same name as the field</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class A {
+    @Volatile
+    private var i = 0
+
+    fun f() {
+        for (i in 1..3) {
+            var i = 0
+            i++
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: this.count++ on volatile field</description>
+        <expected-problems>1</expected-problems>
+        <code><![CDATA[
+class A {
+    @Volatile
+    private var count = 0
+
+    fun f() {
+        this.count++
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: volatile field of outer class incremented in nested class</description>
+        <expected-problems>1</expected-problems>
+        <code><![CDATA[
+class Outer {
+    @Volatile
+    private var count = 0
+
+    inner class Inner {
+        fun f() {
+            count++
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: volatile companion field incremented</description>
+        <expected-problems>1</expected-problems>
+        <code><![CDATA[
+class A {
+    companion object {
+        @Volatile
+        private var count = 0
+
+        fun f() {
+            count++
+        }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: volatile top-level-in-class field incremented from lambda</description>
+        <expected-problems>1</expected-problems>
+        <code><![CDATA[
+class A {
+    @Volatile
+    private var count = 0
+
+    fun f(xs: List<Int>) {
+        xs.forEach { count++ }
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>bad: compound assignment on volatile field, plain and via this</description>
+        <expected-problems>2</expected-problems>
+        <code><![CDATA[
+class A {
+    @Volatile
+    private var count = 0
+
+    fun f() {
+        count += 1
+        this.count -= 1
+    }
+}
+        ]]></code>
+    </test-code>
+
+    <test-code>
+        <description>good: compound assignment and increment on the same-named property of another object</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+class Other { var count = 0 }
+
+class A {
+    @Volatile
+    private var count = 0
+
+    fun f(o: Other) {
+        o.count += 1
+        o.count++
+        ++o.count
+    }
+}
+        ]]></code>
+    </test-code>
+
 </test-data>

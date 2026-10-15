@@ -396,6 +396,10 @@ local variables because `not(ancestor::FunctionBody)` only guarded the `var` bra
 matches `cached!!` (false positive in `AvoidIncrementOrDecrementForVolatileField`). Test `PostfixUnaryOperator[T-INCR or T-DECR]`.
 Prefix forms are separate nodes: `PrefixUnaryExpression/UnaryPrefix/PrefixUnaryOperator[T-INCR or T-DECR]` with the operand in
 `PostfixUnaryExpression/PrimaryExpression`; a rule that only looks at `PostfixUnaryExpression` misses `--x` and `++x`.
+Also in that rule: match field names by name only against member properties of the ancestor class bodies
+(`ancestor::ClassBody/ClassMemberDeclarations/ClassMemberDeclaration/Declaration/PropertyDeclaration`), skip plain names that
+are redeclared as a local, loop or lambda variable (`ancestor::FunctionBody[1]//VariableDeclaration`) or as a parameter, treat
+`this.x` as the field regardless, and do not match `obj.x` (receiver is another object). `let` works for sharing these sets.
 
 ## Upstream PMD improvement ideas (tracked, not yet filed)
 
