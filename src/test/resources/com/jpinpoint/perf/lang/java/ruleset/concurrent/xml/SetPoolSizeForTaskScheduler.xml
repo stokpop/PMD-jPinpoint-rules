@@ -143,4 +143,28 @@ public class Foo {
 }
      ]]></code>
     </test-code>
+    <test-code>
+        <description>violation: same named setter on another type does not configure the scheduler</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+
+public class Foo {
+    Object create() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler(); //bad
+        configureOther(new MyPool());
+        return scheduler;
+    }
+
+    private void configureOther(MyPool pool) {
+        pool.setPoolSize(5);
+    }
+
+    static class MyPool {
+        void setPoolSize(int n) {}
+    }
+}
+     ]]></code>
+    </test-code>
 </test-data>

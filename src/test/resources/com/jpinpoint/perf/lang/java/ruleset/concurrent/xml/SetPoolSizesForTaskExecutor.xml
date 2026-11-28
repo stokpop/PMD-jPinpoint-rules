@@ -511,4 +511,59 @@ public class Foo {
 }
      ]]></code>
     </test-code>
+    <test-code>
+        <description>violation: same named setters or builder methods on another type do not configure the executor</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>6,12</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.boot.task.ThreadPoolTaskExecutorBuilder;
+
+public class Foo {
+    Object create() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor(); //bad
+        configureOther(new MyPool());
+        return executor;
+    }
+
+    Object createBuilt() {
+        ThreadPoolTaskExecutorBuilder builder = new ThreadPoolTaskExecutorBuilder(); //bad
+        MyPool pool = new MyPool();
+        pool.corePoolSize(10);
+        pool.maxPoolSize(20);
+        return builder.build();
+    }
+
+    private void configureOther(MyPool pool) {
+        pool.setCorePoolSize(10);
+        pool.setMaxPoolSize(20);
+    }
+
+    static class MyPool {
+        void setCorePoolSize(int n) {}
+        void setMaxPoolSize(int n) {}
+        MyPool corePoolSize(int n) { return this; }
+        MyPool maxPoolSize(int n) { return this; }
+    }
+}
+     ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: sizes set via a subclass of ThreadPoolTaskExecutor</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+public class Foo {
+    ThreadPoolTaskExecutor create() {
+        MyExecutor executor = new MyExecutor();
+        executor.setCorePoolSize(10);
+        executor.setMaxPoolSize(20);
+        return executor;
+    }
+
+    static class MyExecutor extends ThreadPoolTaskExecutor {}
+}
+     ]]></code>
+    </test-code>
 </test-data>
