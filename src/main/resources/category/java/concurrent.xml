@@ -1860,17 +1860,26 @@ class RightUseOfGuardedBy {
             <property name="tags" value="bad-practice,jpinpoint-rule,memory,performance,sustainability-low" type="String" description="classification"/>
             <property name="xpath">
                 <value><![CDATA[
+(: Find creations of the type that have no (complete) pool size configuration. Where the sizes may be set is limited to the created instance, to avoid crediting other instances. :)
 //ConstructorCall[pmd-java:typeIs('org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor')
         or pmd-java:typeIs('org.springframework.boot.task.ThreadPoolTaskExecutorBuilder')
         or pmd-java:typeIs('org.springframework.boot.task.TaskExecutorBuilder')]
-    [let $scope := (ancestor::MethodDeclaration | ancestor::ConstructorDeclaration | ancestor::Initializer | ancestor::ClassBody)[last()],
+    [(: scope: where the instance is created: the method, constructor or initializer, or the class for a field :)
+     let $scope := (ancestor::MethodDeclaration | ancestor::ConstructorDeclaration | ancestor::Initializer | ancestor::ClassBody)[last()],
+         (: methods of the same class that are called from the scope, they may do the configuration, e.g. configure(executor) :)
          $called := $scope//MethodCall/@MethodName,
          $others := ancestor::ClassBody[1]/MethodDeclaration[@Name = $called],
+         (: name of the variable the instance is assigned to: declaration, field or assignment, if any :)
          $var := (parent::VariableDeclarator/@Name, parent::AssignmentExpression/*[1][self::VariableAccess or self::FieldAccess]/@Name)[1],
+         (: calls made on the created instance: a builder chain around the constructor call, or calls on the variable or on a chain
+            starting at the variable (b.corePoolSize(1).maxPoolSize(2)), not when the variable only appears as argument.
+            For fields, skip same named locals or parameters of other methods (shadowing). :)
          $own := (ancestor::MethodCall | $scope//MethodCall[exists($var) and (let $m := . return exists(.//*[
              (self::FieldAccess or (self::VariableAccess and not($scope[self::ClassBody] and ancestor::MethodDeclaration[(.//LocalVariableDeclaration//VariableId | .//FormalParameter/VariableId)/@Name = $var])))
              and @Name = $var and not(ancestor::ArgumentList[ancestor::MethodCall[. is $m]])]))]),
+         (: calls of the instance plus all calls in called methods of the same class, in those any receiver counts :)
          $all := ($own | $others//MethodCall)
+     (: violation unless both sizes are set. Builders are immutable: a call with discarded result (expression statement) has no effect. :)
      return not($all[@MethodName='setCorePoolSize' or (@MethodName='corePoolSize' and not(parent::ExpressionStatement))]
          and $all[@MethodName='setMaxPoolSize' or (@MethodName='maxPoolSize' and not(parent::ExpressionStatement))])]
     ]]>
@@ -1922,15 +1931,24 @@ Object goodBuilder() {
             <property name="tags" value="bad-practice,jpinpoint-rule,memory,performance,sustainability-low" type="String" description="classification"/>
             <property name="xpath">
                 <value><![CDATA[
+(: Find creations of the type that have no (complete) pool size configuration. Where the sizes may be set is limited to the created instance, to avoid crediting other instances. :)
 //ConstructorCall[pmd-java:typeIs('org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler')]
-    [let $scope := (ancestor::MethodDeclaration | ancestor::ConstructorDeclaration | ancestor::Initializer | ancestor::ClassBody)[last()],
+    [(: scope: where the instance is created: the method, constructor or initializer, or the class for a field :)
+     let $scope := (ancestor::MethodDeclaration | ancestor::ConstructorDeclaration | ancestor::Initializer | ancestor::ClassBody)[last()],
+         (: methods of the same class that are called from the scope, they may do the configuration, e.g. configure(executor) :)
          $called := $scope//MethodCall/@MethodName,
          $others := ancestor::ClassBody[1]/MethodDeclaration[@Name = $called],
+         (: name of the variable the instance is assigned to: declaration, field or assignment, if any :)
          $var := (parent::VariableDeclarator/@Name, parent::AssignmentExpression/*[1][self::VariableAccess or self::FieldAccess]/@Name)[1],
+         (: calls made on the created instance: a builder chain around the constructor call, or calls on the variable or on a chain
+            starting at the variable (b.corePoolSize(1).maxPoolSize(2)), not when the variable only appears as argument.
+            For fields, skip same named locals or parameters of other methods (shadowing). :)
          $own := (ancestor::MethodCall | $scope//MethodCall[exists($var) and (let $m := . return exists(.//*[
              (self::FieldAccess or (self::VariableAccess and not($scope[self::ClassBody] and ancestor::MethodDeclaration[(.//LocalVariableDeclaration//VariableId | .//FormalParameter/VariableId)/@Name = $var])))
              and @Name = $var and not(ancestor::ArgumentList[ancestor::MethodCall[. is $m]])]))]),
+         (: calls of the instance plus all calls in called methods of the same class, in those any receiver counts :)
          $all := ($own | $others//MethodCall)
+     (: violation unless the pool size is set :)
      return not($all[@MethodName='setPoolSize'])]
     ]]>
                 </value>
@@ -1969,6 +1987,8 @@ private ThreadPoolTaskScheduler good() {
             <property name="tags" value="bad-practice,jpinpoint-rule,performance,sustainability-low" type="String" description="classification"/>
             <property name="xpath">
                 <value><![CDATA[
+(: @Async without executor name uses the default executor: no value member, as in @Async or @Async(), or an empty value, 
+   literal or via a String constant of the same class :)
 //Annotation[pmd-java:typeIs('org.springframework.scheduling.annotation.Async')]
     [not(AnnotationMemberList/MemberValuePair[@Name='value']) or AnnotationMemberList/MemberValuePair[@Name='value']/*[self::StringLiteral[@Empty=true()]
         or (self::VariableAccess and (let $n := @Name return ancestor::ClassBody[1]/FieldDeclaration/VariableDeclarator[VariableId/@Name = $n]/StringLiteral[@Empty=true()]))]]
