@@ -108,4 +108,39 @@ public class Foo {
 }
      ]]></code>
     </test-code>
+    <test-code>
+        <description>violation and no violation: assignment forms</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>10</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+
+public class Foo {
+    private ThreadPoolTaskScheduler scheduler;
+    private ThreadPoolTaskScheduler other;
+
+    void init() {
+        this.scheduler = new ThreadPoolTaskScheduler();
+        this.scheduler.setPoolSize(5);
+        other = new ThreadPoolTaskScheduler(); //bad
+    }
+}
+     ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation: pool size only used as argument</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>5</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+
+public class Foo {
+    void copy() {
+        ThreadPoolTaskScheduler a = new ThreadPoolTaskScheduler(); //bad
+        ThreadPoolTaskScheduler b = new ThreadPoolTaskScheduler();
+        b.setPoolSize(a.getPoolSize());
+    }
+}
+     ]]></code>
+    </test-code>
 </test-data>

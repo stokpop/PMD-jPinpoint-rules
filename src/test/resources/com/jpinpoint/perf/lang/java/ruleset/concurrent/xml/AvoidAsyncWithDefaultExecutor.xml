@@ -73,4 +73,66 @@ public class Foo {
 }
      ]]></code>
     </test-code>
+    <test-code>
+        <description>violation: empty value given by name</description>
+        <expected-problems>1</expected-problems>
+        <expected-linenumbers>4</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.scheduling.annotation.Async;
+
+public class Foo {
+    @Async(value = "") //bad
+    public void bad() {
+    }
+}
+     ]]></code>
+    </test-code>
+    <test-code>
+        <description>no violation: other Async annotation</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import com.example.Async;
+
+public class Foo {
+    @Async
+    public void ok() {
+    }
+}
+     ]]></code>
+    </test-code>
+    <test-code>
+        <description>violation and no violation: constant forms</description>
+        <expected-problems>2</expected-problems>
+        <expected-linenumbers>6,12</expected-linenumbers>
+        <code><![CDATA[
+import org.springframework.scheduling.annotation.Async;
+
+public class Foo {
+    static final String EMPTY = "";
+    static final String POOL = "myPool";
+    @Async(EMPTY) //bad
+    public void bad() {
+    }
+    @Async(value = POOL)
+    public void good() {
+    }
+    @Async(value = EMPTY) //bad
+    public void bad2() {
+    }
+}
+     ]]></code>
+    </test-code>
+    <test-code>
+        <description>limitation: constant of another class is not resolved</description>
+        <expected-problems>0</expected-problems>
+        <code><![CDATA[
+import org.springframework.scheduling.annotation.Async;
+
+public class Foo {
+    @Async(Other.EMPTY)
+    public void notFound() {
+    }
+}
+     ]]></code>
+    </test-code>
 </test-data>
